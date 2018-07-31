@@ -1,6 +1,6 @@
 """PyDiggy"""
 
-from .cli import main
+from pydiggy.cli import main
 
 import sys
 

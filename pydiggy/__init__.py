@@ -3,12 +3,11 @@
 """Top-level package for PyDiggy."""
 
 __author__ = """Adam Hopkins"""
-__email__ = 'admhpkns@gmail.com'
-__version__ = '0.1.0'
+__email__ = "admhpkns@gmail.com"
+__version__ = "0.1.0"
 
-from .node import Node
+from pydiggy.node import Node
+from pydiggy.operations import generate_mutation
 
 
-__all__ = (
-    'Node',
-)
+__all__ = ("Node", "generate_mutation")
