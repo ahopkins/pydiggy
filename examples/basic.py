@@ -28,4 +28,4 @@ if __name__ == '__main__':
     gas.stage()
     mar.stage()
 
-    generate_mutation()
+    print(generate_mutation())
