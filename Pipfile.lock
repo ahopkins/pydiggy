@@ -1,7 +1,20 @@
 {
     "_meta": {
         "hash": {
-            "sha256": "98de4fcef99a3ae0e8e2ced1aabfe7b1e4be402526de249f25dd0b2cd24628e0"
+            "sha256": "0f2070111e0540f9f7df52fcbcda752278880a2438cfac9c306c8676c8151ca8"
+        },
+        "host-environment-markers": {
+            "implementation_name": "cpython",
+            "implementation_version": "3.7.0c1",
+            "os_name": "posix",
+            "platform_machine": "x86_64",
+            "platform_python_implementation": "CPython",
+            "platform_release": "4.13.0-46-generic",
+            "platform_system": "Linux",
+            "platform_version": "#51-Ubuntu SMP Tue Jun 12 12:36:29 UTC 2018",
+            "python_full_version": "3.7.0rc1",
+            "python_version": "3.7",
+            "sys_platform": "linux"
         },
         "pipfile-spec": 6,
         "requires": {
@@ -16,16 +29,57 @@
         ]
     },
     "default": {
+        "371f01a": {
+            "editable": true,
+            "path": "./"
+        },
+        "appdirs": {
+            "hashes": [],
+            "version": "==1.4.3"
+        },
+        "attrs": {
+            "hashes": [],
+            "version": "==18.1.0"
+        },
+        "black": {
+            "hashes": [],
+            "version": "==18.6b4"
+        },
         "click": {
-            "hashes": [
-                "sha256:29f99fc6125fbc931b758dc053b3114e55c77a6e4c6c3a2674a2dc986016381d",
-                "sha256:f15516df478d5a56180fbf80e68f206010e6d160fc39fa508b65e035fd75130b"
-            ],
+            "hashes": [],
             "version": "==6.7"
+        },
+        "enum34": {
+            "hashes": [],
+            "version": "==1.1.6"
+        },
+        "futures": {
+            "hashes": [],
+            "version": "==3.1.1"
+        },
+        "grpcio": {
+            "hashes": [],
+            "version": "==1.10.0"
+        },
+        "protobuf": {
+            "hashes": [],
+            "version": "==3.6.0"
+        },
+        "pydgraph": {
+            "hashes": [],
+            "version": "==1.0.0"
         },
         "pydiggy": {
             "editable": true,
             "path": "."
+        },
+        "six": {
+            "hashes": [],
+            "version": "==1.11.0"
+        },
+        "toml": {
+            "hashes": [],
+            "version": "==0.9.4"
         }
     },
     "develop": {}

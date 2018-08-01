@@ -50,8 +50,20 @@ def generate_mutation():
                 obj = [obj]
 
             for o in obj:
+                facets = []
+                if isinstance(o, tuple) and hasattr(o, 'obj'):
+                    for facet in o.__class__._fields[1:]:
+                        val = getattr(o, facet)
+                        facets.append(f'{facet}="{val}"')
+                    o = o.obj
+
                 o = _make_obj(node, pred, o)
-                line = f'\t\t{subject} <{pred}> {o} .'
+
+                if facets:
+                    facets = ', '.join(facets)
+                    line = f'\t\t{subject} <{pred}> {o} ({facets}) .'
+                else:
+                    line = f'\t\t{subject} <{pred}> {o} .'
                 query.append(line)
 
     query.append('\t}')

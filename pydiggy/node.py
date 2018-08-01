@@ -4,6 +4,7 @@ import uuid
 from itertools import count
 from typing import get_type_hints, Union, List, _GenericAlias
 from dataclasses import dataclass
+from collections import namedtuple
 
 
 DGRAPH_TYPES = {
@@ -13,6 +14,11 @@ DGRAPH_TYPES = {
     "bool": "bool",
     "datetime": "dateTime",
 }
+
+
+def Facets(obj, **kwargs):
+    f = namedtuple('Facets', ['obj'] + list(kwargs.keys()))
+    return f(obj, *kwargs.values())
 
 
 @dataclass
