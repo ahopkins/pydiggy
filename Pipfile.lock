@@ -1,7 +1,7 @@
 {
     "_meta": {
         "hash": {
-            "sha256": "0f2070111e0540f9f7df52fcbcda752278880a2438cfac9c306c8676c8151ca8"
+            "sha256": "de1f6b1860491e5f0cd1d0f374c5bc258c05c26a51023bfde789d64aadad2976"
         },
         "host-environment-markers": {
             "implementation_name": "cpython",
@@ -29,13 +29,17 @@
         ]
     },
     "default": {
-        "371f01a": {
-            "editable": true,
-            "path": "./"
+        "apipkg": {
+            "hashes": [],
+            "version": "==1.5"
         },
         "appdirs": {
             "hashes": [],
             "version": "==1.4.3"
+        },
+        "atomicwrites": {
+            "hashes": [],
+            "version": "==1.1.5"
         },
         "attrs": {
             "hashes": [],
@@ -49,9 +53,22 @@
             "hashes": [],
             "version": "==6.7"
         },
+        "coverage": {
+            "hashes": [],
+            "version": "==4.5.1"
+        },
         "enum34": {
             "hashes": [],
             "version": "==1.1.6"
+        },
+        "execnet": {
+            "hashes": [],
+            "version": "==1.5.0"
+        },
+        "funcsigs": {
+            "hashes": [],
+            "markers": "python_version < '3.0'",
+            "version": "==1.0.2"
         },
         "futures": {
             "hashes": [],
@@ -61,9 +78,30 @@
             "hashes": [],
             "version": "==1.10.0"
         },
+        "more-itertools": {
+            "hashes": [],
+            "version": "==4.3.0"
+        },
+        "pathlib2": {
+            "hashes": [],
+            "markers": "python_version < '3.6'",
+            "version": "==2.3.2"
+        },
+        "pep8": {
+            "hashes": [],
+            "version": "==1.7.1"
+        },
+        "pluggy": {
+            "hashes": [],
+            "version": "==0.7.1"
+        },
         "protobuf": {
             "hashes": [],
             "version": "==3.6.0"
+        },
+        "py": {
+            "hashes": [],
+            "version": "==1.5.4"
         },
         "pydgraph": {
             "hashes": [],
@@ -72,6 +110,35 @@
         "pydiggy": {
             "editable": true,
             "path": "."
+        },
+        "pyflakes": {
+            "hashes": [],
+            "version": "==2.0.0"
+        },
+        "pytest": {
+            "hashes": [],
+            "version": "==3.7.0"
+        },
+        "pytest-cache": {
+            "hashes": [],
+            "version": "==1.0"
+        },
+        "pytest-cov": {
+            "hashes": [],
+            "version": "==2.5.1"
+        },
+        "pytest-flakes": {
+            "hashes": [],
+            "version": "==4.0.0"
+        },
+        "pytest-pep8": {
+            "hashes": [],
+            "version": "==1.0.6"
+        },
+        "scandir": {
+            "hashes": [],
+            "markers": "python_version < '3.5'",
+            "version": "==1.7"
         },
         "six": {
             "hashes": [],

@@ -15,3 +15,10 @@ class NotStaged(AttributeError):
             "Did you forget to call <node>.stage()"
 
         super().__init__(msg)
+
+
+class InvalidData(Exception):
+    def __init__(self, msg=''):
+        msg = f"Data in invalid format. {msg}"
+
+        super().__init__(msg)

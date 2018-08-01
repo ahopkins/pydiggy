@@ -1,5 +1,5 @@
 from pydiggy.node import Node
-from pydiggy.exceptions import NotStaged
+from pydiggy.exceptions import NotStaged, InvalidData
 from typing import get_type_hints, List
 
 
@@ -73,4 +73,26 @@ def generate_mutation():
 
     query = '\n'.join(query)
 
-    print(query)
+    return query
+
+
+def hydrate(data):
+    if not isinstance(data, dict) or 'data' not in data:
+        raise InvalidData
+
+    output = {}
+    data = data.get('data')
+    registered = {x.__name__: x for x in Node._nodes}
+
+    for func_name, raw_data in data.items():
+        hydrated = []
+        for raw in raw_data:
+            if '_type' in raw and raw.get('_type') in registered:
+                cls = registered.get(raw.get('_type'))
+                hydrated.append(cls._hydrate(raw))
+            else:
+                pass
+
+        output[func_name] = hydrated
+
+    return output

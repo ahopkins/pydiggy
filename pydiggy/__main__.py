@@ -1,8 +1,8 @@
 """PyDiggy"""
 
-from pydiggy.cli import main
+from pydiggy.cli import main  # noqa
 
-import sys
+import sys  # noqa
 
 
 if __name__ == "__main__":

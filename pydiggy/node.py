@@ -1,10 +1,11 @@
-from .exceptions import ConflictingType
+from pydiggy.exceptions import ConflictingType, InvalidData
 import inspect
 import uuid
 from itertools import count
 from typing import get_type_hints, Union, List, _GenericAlias
 from dataclasses import dataclass
 from collections import namedtuple
+from copy import deepcopy
 
 
 DGRAPH_TYPES = {
@@ -19,6 +20,13 @@ DGRAPH_TYPES = {
 def Facets(obj, **kwargs):
     f = namedtuple('Facets', ['obj'] + list(kwargs.keys()))
     return f(obj, *kwargs.values())
+
+
+def is_facets(node):
+    if isinstance(node, tuple) and hasattr(node, 'obj') and \
+            node.__class__.__name__ == 'Facets':
+        return True
+    return False
 
 
 @dataclass
@@ -84,31 +92,27 @@ class Node:
             name = node._get_name()
             type_schema.append(f"{name}: bool @index(bool) .")
 
-            try:
-                annotations = get_type_hints(node)
-            except NameError as e:
-                raise e
-            else:
-                for prop_name, prop_type in annotations.items():
-                    if prop_name in edges:
-                        if prop_type != edges.get(
-                            prop_name
-                        ) and not cls._is_node_type(prop_type):
-                            raise ConflictingType(
-                                prop_name, prop_type, edges.get(prop_name)
-                            )
+            annotations = get_type_hints(node)
+            for prop_name, prop_type in annotations.items():
+                if prop_name in edges:
+                    if prop_type != edges.get(
+                        prop_name
+                    ) and not cls._is_node_type(prop_type):
+                        raise ConflictingType(
+                            prop_name, prop_type, edges.get(prop_name)
+                        )
 
-                    if isinstance(prop_type, _GenericAlias) and \
-                            prop_type.__origin__ == list:
-                        prop_type = prop_type.__args__[0]
+                if isinstance(prop_type, _GenericAlias) and \
+                        prop_type.__origin__ == list:
+                    prop_type = prop_type.__args__[0]
 
-                    if prop_type in (str, int, bool):
-                        edges[prop_name] = prop_type
-                    elif cls._is_node_type(prop_type):
-                        edges[prop_name] = "uid"
-                    else:
-                        if prop_name != 'uid':
-                            unknown_schema.append(f"{prop_name}: {prop_type}")
+                if prop_type in (str, int, bool):
+                    edges[prop_name] = prop_type
+                elif cls._is_node_type(prop_type):
+                    edges[prop_name] = "uid"
+                else:
+                    if prop_name != 'uid':
+                        unknown_schema.append(f"{prop_name}: {prop_type}")
 
         for edge_name, edge_type in edges.items():
             type_name = cls._get_type_name(edge_type)
@@ -137,6 +141,43 @@ class Node:
     @classmethod
     def _get_staged(cls):
         return cls._staged
+
+    @classmethod
+    def _hydrate(cls, raw):
+        registered = {x.__name__: x for x in Node._nodes}
+
+        if '_type' in raw and raw.get('_type') in registered:
+            if 'uid' not in raw:
+                raise InvalidData('Missing uid.')
+
+            keys = deepcopy(list(raw.keys()))
+            facet_data = [
+                (key.split('|')[1], raw.pop(key))
+                for key in keys
+                if '|' in key
+            ]
+
+            kwargs = {
+                'uid': int(raw.pop('uid'), 16),
+            }
+
+            for pred, value in raw.items():
+
+                if not pred.startswith('_') and pred in cls.__annotations__:
+                    if isinstance(value, list):
+                        value = [cls._hydrate(x) for x in value]
+                    elif isinstance(value, dict):
+                        value = cls._hydrate(value)
+                    if value:
+                        kwargs.update({pred: value})
+
+            instance = cls(**kwargs)
+
+            if facet_data:
+                return Facets(instance, **dict(facet_data))
+            else:
+                return instance
+        return None
 
     @staticmethod
     def _is_node_type(cls):

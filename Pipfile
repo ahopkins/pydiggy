@@ -15,7 +15,11 @@ pydiggy = {path = ".", editable = true}
 black = "*"
 pydgraph = "*"
 click = "*"
-"371f01a" = {path = "./", editable = true}
+pytest = "*"
+coverage = "*"
+pytest-cov = "*"
+pytest-flakes = "*"
+"pytest-pep8" = "*"
 
 
 [requires]
