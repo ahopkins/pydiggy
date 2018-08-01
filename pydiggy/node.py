@@ -6,6 +6,8 @@ from typing import get_type_hints, Union, List, _GenericAlias
 from dataclasses import dataclass
 from collections import namedtuple
 from copy import deepcopy
+from datetime import datetime
+from decimal import Decimal
 
 
 DGRAPH_TYPES = {
@@ -14,7 +16,10 @@ DGRAPH_TYPES = {
     "float": "float",
     "bool": "bool",
     "datetime": "dateTime",
+    "Decimal": "float",
 }
+
+ACCEPTABLE_TRANSLATIONS = (str, int, bool, float, datetime, Decimal)
 
 
 def Facets(obj, **kwargs):
@@ -94,6 +99,19 @@ class Node:
 
             annotations = get_type_hints(node)
             for prop_name, prop_type in annotations.items():
+                # TODO:
+                # - Probably need to be a little more careful for the origins
+                # - Currently, it is assuming Union[something, None],
+                #   but if you had two legit items inside Union (or anything else)
+                #   then the second would be ignored. Which, is probably correct
+                #   unless Dgraph schema would allow multiple types for a single
+                #   predicate. If it is possible, then the solution may simply
+                #   be to loop over a list of deepcopy(annotations.items()),
+                #   and append all the __args__ to that list to extend the iteration
+                if isinstance(prop_type, _GenericAlias) and \
+                        prop_type.__origin__ in (list, tuple, Union):
+                    prop_type = prop_type.__args__[0]
+
                 if prop_name in edges:
                     if prop_type != edges.get(
                         prop_name
@@ -102,17 +120,15 @@ class Node:
                             prop_name, prop_type, edges.get(prop_name)
                         )
 
-                if isinstance(prop_type, _GenericAlias) and \
-                        prop_type.__origin__ == list:
-                    prop_type = prop_type.__args__[0]
-
-                if prop_type in (str, int, bool):
+                if prop_type in ACCEPTABLE_TRANSLATIONS:
                     edges[prop_name] = prop_type
                 elif cls._is_node_type(prop_type):
                     edges[prop_name] = "uid"
                 else:
                     if prop_name != 'uid':
-                        unknown_schema.append(f"{prop_name}: {prop_type}")
+                        origin = getattr(prop_type, '__origin__', None)
+                        # if origin and origin
+                        unknown_schema.append(f"{prop_name}: {prop_type} || {origin}")
 
         for edge_name, edge_type in edges.items():
             type_name = cls._get_type_name(edge_type)

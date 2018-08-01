@@ -12,7 +12,7 @@ from pydgraph import Operation
 @click.group()
 def main():
     """Console script for pydiggy."""
-    pass
+    pass  # noqa
 
 
 @main.command()

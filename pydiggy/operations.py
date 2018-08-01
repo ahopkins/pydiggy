@@ -1,6 +1,6 @@
 from pydiggy.node import Node
 from pydiggy.exceptions import NotStaged, InvalidData
-from typing import get_type_hints, List
+from typing import get_type_hints, List, Union, Tuple
 
 
 def _parse_subject(uid):
@@ -13,14 +13,16 @@ def _parse_subject(uid):
 def _make_obj(node, pred, obj):
     localns = {x.__name__: x for x in Node._nodes}
     localns.update({
-        'List': List
+        'List': List,
+        'Union': Union,
+        'Tuple': Tuple,
     })
     annotations = get_type_hints(node, localns=localns)
     annotation = annotations.get(pred, '')
     if annotation == str:
         obj = f'"{obj}"'
     elif annotation == bool:
-        obj = f'"{obj.lower()}"'
+        obj = f'"{str(obj).lower()}"'
     elif annotation in (int, float, ):
         obj = obj
     elif Node._is_node_type(obj.__class__):
@@ -90,8 +92,6 @@ def hydrate(data):
             if '_type' in raw and raw.get('_type') in registered:
                 cls = registered.get(raw.get('_type'))
                 hydrated.append(cls._hydrate(raw))
-            else:
-                pass
 
         output[func_name] = hydrated
 

@@ -1,4 +1,4 @@
-class ConflictingType(AttributeError):
+class ConflictingType(AttributeError):  # noqa
     def __init__(self, pname, incoming, existing):
         incoming_name = getattr(incoming, "__name__", repr(incoming))
         existing_name = getattr(existing, "__name__", repr(existing))
@@ -9,7 +9,7 @@ class ConflictingType(AttributeError):
         super().__init__(msg)
 
 
-class NotStaged(AttributeError):
+class NotStaged(AttributeError):  # noqa
     def __init__(self, uid):
         msg = f"Cannot generate with unstaged reference {uid}. " \
             "Did you forget to call <node>.stage()"
@@ -17,7 +17,7 @@ class NotStaged(AttributeError):
         super().__init__(msg)
 
 
-class InvalidData(Exception):
+class InvalidData(Exception):  # noqa
     def __init__(self, msg=''):
         msg = f"Data in invalid format. {msg}"
 

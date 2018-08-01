@@ -1,38 +1,37 @@
-# #!/usr/bin/env python
-# # -*- coding: utf-8 -*-
+#!/usr/bin/env python
+# -*- coding: utf-8 -*-
 
-# """Tests for `pydiggy` package."""
+"""Tests for `pydiggy` package."""
 
-# import pytest
+import pytest
 
-# from click.testing import CliRunner
+from click.testing import CliRunner
 
-# from pydiggy import pydiggy
-# from pydiggy import cli
-
-
-# @pytest.fixture
-# def response():
-#     """Sample pytest fixture.
-
-#     See more at: http://doc.pytest.org/en/latest/fixture.html
-#     """
-#     # import requests
-#     # return requests.get('https://github.com/audreyr/cookiecutter-pypackage')
+from pydiggy import cli, Node
 
 
-# def test_content(response):
-#     """Sample pytest test function with the pytest fixture as an argument."""
-#     # from bs4 import BeautifulSoup
-#     # assert 'GitHub' in BeautifulSoup(response.content).title.string
+@pytest.fixture
+def runner():
+    runner = CliRunner()
+    return runner
 
 
-# def test_command_line_interface():
-#     """Test the CLI."""
-#     runner = CliRunner()
-#     result = runner.invoke(cli.main)
-#     assert result.exit_code == 0
-#     assert "pydiggy.cli.main" in result.output
-#     help_result = runner.invoke(cli.main, ["--help"])
-#     assert help_result.exit_code == 0
-#     assert "--help  Show this message and exit." in help_result.output
+def test_command_line_interface_has_commands(runner, commands):
+    result = runner.invoke(cli.main)
+    assert result.exit_code == 0
+
+    for command in commands:
+        assert command in result.output
+
+
+def test_dry_run_generate_schema(runner):
+    Node._nodes = []
+    result = runner.invoke(cli.main, ["generate", "tests.fakeapp", "--no-run"])
+    assert result.exit_code == 0
+    assert "Nodes found: (1)" in result.output
+    assert "Region: bool @index(bool) ." in result.output
+    assert "_type: string ." in result.output
+    assert "area: int ." in result.output
+    assert "borders: uid ." in result.output
+    assert "name: string ." in result.output
+    assert "population: int ." in result.output
