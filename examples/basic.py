@@ -16,7 +16,7 @@ if __name__ == '__main__':
     por = Region(uid=0x11, name="Portugal")
     spa = Region(uid=0x12, name="Spain")
     gas = Region(uid=0x13, name="Gascony")
-    mar = Region(name="Marseilles")
+    mar = Region(uid=0x14, name="Marseilles")
 
     por.borders = [spa]
     spa.borders = [por, gas, mar]

@@ -44,6 +44,8 @@ def generate_mutation():
 
         line = f'\t\t{subject} <{node.__class__.__name__}> "true" .'
         query.append(line)
+        line = f'\t\t{subject} <_type> "{node.__class__.__name__}" .'
+        query.append(line)
 
         for pred, obj in edges.items():
             if not isinstance(obj, list):

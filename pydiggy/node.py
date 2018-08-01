@@ -78,6 +78,8 @@ class Node:
         edge_schema = []
         unknown_schema = []
 
+        type_schema.append(f"_type: string .")
+
         for node in nodes:
             name = node._get_name()
             type_schema.append(f"{name}: bool @index(bool) .")
