@@ -10,7 +10,12 @@ from datetime import datetime
 from decimal import Decimal
 
 
+class uid:
+    pass
+
+
 DGRAPH_TYPES = {
+    "uid": "uid",
     "str": "string",
     "int": "int",
     "float": "float",
@@ -19,7 +24,7 @@ DGRAPH_TYPES = {
     "Decimal": "float",
 }
 
-ACCEPTABLE_TRANSLATIONS = (str, int, bool, float, datetime, Decimal)
+ACCEPTABLE_TRANSLATIONS = (str, int, bool, float, datetime, Decimal, uid)
 
 
 def Facets(obj, **kwargs):
@@ -108,30 +113,37 @@ class Node:
                 #   predicate. If it is possible, then the solution may simply
                 #   be to loop over a list of deepcopy(annotations.items()),
                 #   and append all the __args__ to that list to extend the iteration
+                is_list_type = True if isinstance(prop_type, _GenericAlias) and \
+                    prop_type.__origin__ in (list, tuple, ) else False
+
                 if isinstance(prop_type, _GenericAlias) and \
                         prop_type.__origin__ in (list, tuple, Union):
                     prop_type = prop_type.__args__[0]
 
+                prop_type = (prop_type, is_list_type)
+
                 if prop_name in edges:
                     if prop_type != edges.get(
                         prop_name
-                    ) and not cls._is_node_type(prop_type):
+                    ) and not cls._is_node_type(prop_type[0]):
                         raise ConflictingType(
                             prop_name, prop_type, edges.get(prop_name)
                         )
 
-                if prop_type in ACCEPTABLE_TRANSLATIONS:
+                if prop_type[0] in ACCEPTABLE_TRANSLATIONS:
                     edges[prop_name] = prop_type
-                elif cls._is_node_type(prop_type):
-                    edges[prop_name] = "uid"
+                elif cls._is_node_type(prop_type[0]):
+                    edges[prop_name] = ("uid", is_list_type)
                 else:
                     if prop_name != 'uid':
-                        origin = getattr(prop_type, '__origin__', None)
+                        origin = getattr(prop_type[0], '__origin__', None)
                         # if origin and origin
-                        unknown_schema.append(f"{prop_name}: {prop_type} || {origin}")
+                        unknown_schema.append(f"{prop_name}: {prop_type[0]} || {origin}")
 
-        for edge_name, edge_type in edges.items():
+        for edge_name, (edge_type, is_list_type) in edges.items():
             type_name = cls._get_type_name(edge_type)
+            if is_list_type:
+                type_name = f'[{type_name}]'
             edge_schema.append(f"{edge_name}: {type_name} .")
 
         type_schema.sort()
@@ -151,7 +163,7 @@ class Node:
             return name
         else:
             if name not in DGRAPH_TYPES:
-                raise Exception("Could not find type")
+                raise Exception(f"Could not find type: {name}")
             return DGRAPH_TYPES.get(name)
 
     @classmethod
