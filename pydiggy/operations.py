@@ -1,6 +1,7 @@
 from pydiggy.node import Node
 from pydiggy.exceptions import NotStaged, InvalidData
 from typing import get_type_hints, List, Union, Tuple
+from pydiggy.types import *  # noqa
 
 
 def _parse_subject(uid):
@@ -17,7 +18,7 @@ def _make_obj(node, pred, obj):
         'Union': Union,
         'Tuple': Tuple,
     })
-    annotations = get_type_hints(node, localns=localns)
+    annotations = get_type_hints(node, globalns=globals(), localns=localns)
     annotation = annotations.get(pred, '')
     if annotation == str:
         obj = f'"{obj}"'

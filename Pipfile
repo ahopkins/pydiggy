@@ -20,6 +20,8 @@ coverage = "*"
 pytest-cov = "*"
 pytest-flakes = "*"
 "pytest-pep8" = "*"
+"371f01a" = {path = "./", editable = true}
+mypy = "*"
 
 
 [requires]

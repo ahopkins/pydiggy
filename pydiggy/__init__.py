@@ -6,8 +6,30 @@ __author__ = """Adam Hopkins"""
 __email__ = "admhpkns@gmail.com"
 __version__ = "0.1.0"
 
-from pydiggy.node import Node, Facets, is_facets, uid
+from pydiggy.node import Node
+from pydiggy.node import Facets
+from pydiggy.node import is_facets
 from pydiggy.operations import generate_mutation, hydrate
+from .types import uid
+from .types import geo
+from .types import count
+from .types import index
+from .types import lang
+from .types import reverse
+from .types import upsert
 
 
-__all__ = ("Node", "Facets", "generate_mutation", "hydrate", "is_facets", "uid")
+__all__ = (
+    "count",
+    "Facets",
+    "generate_mutation",
+    "geo",
+    "hydrate",
+    "is_facets",
+    "index",
+    "lang",
+    "Node",
+    "reverse",
+    "uid",
+    "upsert",
+)
