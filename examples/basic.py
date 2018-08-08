@@ -13,9 +13,10 @@ from typing import List, Union
 
 
 class Region(Node):
-    area: int
+    area: int = index(types._int)
     population: int = index
     description: str = lang
+    short_description: str = lang()
     name: str = index(types.fulltext)
     abbr: str = (index(types.exact), count, upsert)
     coord: geo
