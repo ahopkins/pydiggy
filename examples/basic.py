@@ -2,21 +2,35 @@ from __future__ import annotations
 
 
 from pydiggy import Node, generate_mutation, Facets
-from typing import List
+from pydiggy import geo
+from pydiggy import index
+from pydiggy import lang
+from pydiggy import count
+from pydiggy import reverse
+from pydiggy import upsert
+from pydiggy import types
+from typing import List, Union
 
 
 class Region(Node):
-    area: int
-    population: int
-    name: str
-    borders: List[Region]
+    area: int = index(types._int)
+    population: int = index
+    description: str = lang
+    short_description: str = lang()
+    name: str = index(types.fulltext)
+    abbr: str = (index(types.exact), count, upsert)
+    coord: geo
+    borders: List[Region] = reverse
+
+    # __upsert__ = area
+    # __reverse__ = borders
 
 
 if __name__ == '__main__':
-    por = Region(uid=0x11, name="Portugal")
-    spa = Region(uid=0x12, name="Spain")
-    gas = Region(uid=0x13, name="Gascony")
-    mar = Region(uid=0x14, name="Marseilles")
+    por = Region(name="Portugal")
+    spa = Region(name="Spain")
+    gas = Region(name="Gascony")
+    mar = Region(name="Marseilles")
 
     por.borders = [spa]
     spa.borders = [por, gas, mar]
@@ -29,3 +43,5 @@ if __name__ == '__main__':
     mar.stage()
 
     print(generate_mutation())
+    schema, unknown = Node._generate_schema()
+    print(schema)

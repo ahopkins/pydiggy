@@ -1,30 +1,32 @@
-from pydiggy.exceptions import ConflictingType, InvalidData
+from __future__ import annotations
+
 import inspect
-import uuid
-from itertools import count
-from typing import get_type_hints, Union, List, _GenericAlias
-from dataclasses import dataclass
+import copy
+
+from .types import ACCEPTABLE_GENERIC_ALIASES
+from .types import ACCEPTABLE_TRANSLATIONS
+from .types import DGRAPH_TYPES
+from .types import SELF_INSERTING_DIRECTIVE_ARGS
+from .types import geo
+from .types import uid
+from .types import Directive
 from collections import namedtuple
 from copy import deepcopy
+from dataclasses import dataclass
+from dataclasses import field
 from datetime import datetime
 from decimal import Decimal
+from itertools import count
+from pydiggy.exceptions import ConflictingType
+from pydiggy.exceptions import InvalidData
+from typing import Dict
+from typing import List
+from typing import Union
+from typing import _GenericAlias
+from typing import get_type_hints
 
 
-class uid:
-    pass
-
-
-DGRAPH_TYPES = {
-    "uid": "uid",
-    "str": "string",
-    "int": "int",
-    "float": "float",
-    "bool": "bool",
-    "datetime": "dateTime",
-    "Decimal": "float",
-}
-
-ACCEPTABLE_TRANSLATIONS = (str, int, bool, float, datetime, Decimal, uid)
+PropType = namedtuple('PropType', ('prop_type', 'is_list_type', 'directives'))
 
 
 def Facets(obj, **kwargs):
@@ -39,16 +41,58 @@ def is_facets(node):
     return False
 
 
-@dataclass
-class Node:
-    uid: Union[uuid.UUID, int]
+def _force_instance(directive, prop_type=None):
+    if isinstance(directive, Directive):
+        return directive
+
+    args = []
+    key = (directive, prop_type)
+    if key in SELF_INSERTING_DIRECTIVE_ARGS:
+        arg = SELF_INSERTING_DIRECTIVE_ARGS.get(key)
+        args.append(arg)
+
+    return directive(*args)
+
+
+class NodeMeta(type):
+
+    def __new__(cls, name, bases, attrs, **kwargs):
+        directives = [x for x in attrs if x in attrs.get(
+            '__annotations__', {}).keys()]
+        attrs['_directives'] = dict()
+
+        for directive in directives:
+            d = copy.deepcopy(attrs.get(directive))
+            attrs.pop(directive)
+
+            if not isinstance(d, (list, tuple, set)):
+                d = (d, )
+
+            if not all(
+                (inspect.isclass(x) and issubclass(x, Directive)) or
+                issubclass(x.__class__, Directive)
+                for x in d
+            ):
+                continue
+
+            prop_type = attrs.get('__annotations__').get(directive)
+            d = map(lambda x: _force_instance(x, prop_type), d)
+
+            attrs['_directives'][directive] = tuple(d)
+
+        return super().__new__(cls, name, bases, attrs, **kwargs)
+
+
+# @dataclass
+class Node(metaclass=NodeMeta):
+    # uid: Union[uuid.UUID, int]
+    uid: int
 
     _i = count()
-
     _nodes = []
     _staged = {}
 
-    def __init_subclass__(cls, is_abstract: bool = False):
+    def __init_subclass__(cls, is_abstract: bool = False) -> None:
         if not is_abstract:
             cls._register_node(cls)
 
@@ -109,7 +153,7 @@ class Node:
                 # - Currently, it is assuming Union[something, None],
                 #   but if you had two legit items inside Union (or anything else)
                 #   then the second would be ignored. Which, is probably correct
-                #   unless Dgraph schema would allow multiple types for a single
+                #   unless Dgraph schema would not allow multiple types for a single
                 #   predicate. If it is possible, then the solution may simply
                 #   be to loop over a list of deepcopy(annotations.items()),
                 #   and append all the __args__ to that list to extend the iteration
@@ -117,36 +161,67 @@ class Node:
                     prop_type.__origin__ in (list, tuple, ) else False
 
                 if isinstance(prop_type, _GenericAlias) and \
-                        prop_type.__origin__ in (list, tuple, Union):
+                        prop_type.__origin__ in ACCEPTABLE_GENERIC_ALIASES:
                     prop_type = prop_type.__args__[0]
 
-                prop_type = (prop_type, is_list_type)
+                # print(cls._directives)
+                prop_type = PropType(
+                    prop_type,
+                    is_list_type,
+                    node._directives.get(prop_name, [])
+                )
 
                 if prop_name in edges:
-                    if prop_type != edges.get(
-                        prop_name
-                    ) and not cls._is_node_type(prop_type[0]):
-                        raise ConflictingType(
-                            prop_name, prop_type, edges.get(prop_name)
-                        )
+                    if prop_type != edges.get(prop_name) and \
+                            not cls._is_node_type(prop_type[0]):
+
+                        if edges.get(prop_name).directives != prop_type.directives and \
+                                all((inspect.isclass(x) and issubclass(x, Directive)) or
+                                    issubclass(x.__class__, Directive) for x in edges.get(prop_name).directives) and \
+                                all((inspect.isclass(x) and issubclass(x, Directive)) or
+                                    issubclass(x.__class__, Directive) for x in prop_type.directives):
+                            pass
+                        else:
+                            raise ConflictingType(
+                                prop_name, prop_type, edges.get(prop_name)
+                            )
+
+                        print(edges.get(prop_name).prop_type, edges.get(
+                            prop_name).is_list_type, edges.get(prop_name).directives)
+                        print(prop_type.prop_type,
+                              prop_type.is_list_type, prop_type.directives)
 
                 if prop_type[0] in ACCEPTABLE_TRANSLATIONS:
                     edges[prop_name] = prop_type
                 elif cls._is_node_type(prop_type[0]):
-                    edges[prop_name] = ("uid", is_list_type)
+                    edges[prop_name] = PropType(
+                        "uid",
+                        is_list_type,
+                        node._directives.get(prop_name, [])
+                    )
                 else:
                     if prop_name != 'uid':
                         origin = getattr(prop_type[0], '__origin__', None)
                         # if origin and origin
-                        unknown_schema.append(f"{prop_name}: {prop_type[0]} || {origin}")
+                        unknown_schema.append(
+                            f"{prop_name}: {prop_type[0]} || {origin}")
 
-        for edge_name, (edge_type, is_list_type) in edges.items():
-            type_name = cls._get_type_name(edge_type)
-            # Currently, Dgraph does not support [uid] schema. 
-            # See https://github.com/dgraph-io/dgraph/issues/2511
-            if is_list_type and type_name != 'uid':
+# <<<<<<< HEAD
+#         for edge_name, (edge_type, is_list_type) in edges.items():
+#             type_name = cls._get_type_name(edge_type)
+#             # Currently, Dgraph does not support [uid] schema. 
+#             # See https://github.com/dgraph-io/dgraph/issues/2511
+#             if is_list_type and type_name != 'uid':
+# =======
+        for edge_name, edge in edges.items():
+            type_name = cls._get_type_name(edge.prop_type)
+            if edge.is_list_type and type_name != 'uid':
                 type_name = f'[{type_name}]'
-            edge_schema.append(f"{edge_name}: {type_name} .")
+
+            directives = edge.directives
+            directives = ' '.join([str(d) for d in directives] + [''])
+
+            edge_schema.append(f"{edge_name}: {type_name} {directives}.")
 
         type_schema.sort()
         edge_schema.sort()
