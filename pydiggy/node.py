@@ -142,7 +142,9 @@ class Node:
 
         for edge_name, (edge_type, is_list_type) in edges.items():
             type_name = cls._get_type_name(edge_type)
-            if is_list_type:
+            # Currently, Dgraph does not support [uid] schema. 
+            # See https://github.com/dgraph-io/dgraph/issues/2511
+            if is_list_type and type_name != 'uid':
                 type_name = f'[{type_name}]'
             edge_schema.append(f"{edge_name}: {type_name} .")
 
