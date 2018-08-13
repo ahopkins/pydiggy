@@ -2,6 +2,7 @@ from pydiggy.node import Node
 from pydiggy.exceptions import NotStaged, InvalidData
 from typing import get_type_hints, List, Union, Tuple
 from pydiggy.types import *  # noqa
+from pydiggy.connection import get_client
 
 
 def _parse_subject(uid):
@@ -20,12 +21,16 @@ def _make_obj(node, pred, obj):
     })
     annotations = get_type_hints(node, globalns=globals(), localns=localns)
     annotation = annotations.get(pred, '')
+    if hasattr(annotation, '__origin__') and annotation.__origin__ == list:
+        annotation = annotation.__args__[0]
     if annotation == str:
         obj = f'"{obj}"'
     elif annotation == bool:
         obj = f'"{str(obj).lower()}"'
-    elif annotation in (int, float, ):
-        obj = obj
+    elif annotation in (int, ):
+        obj = f'"{int(obj)}"^^<xs:int>'
+    elif annotation in (float, ) or isinstance(obj, float):
+        obj = f'"{obj}"^^<xs:float>'
     elif Node._is_node_type(obj.__class__):
         obj, passed = _parse_subject(obj.uid)
         staged = Node._get_staged()
@@ -33,21 +38,25 @@ def _make_obj(node, pred, obj):
         if obj not in staged and passed not in staged:
             raise NotStaged(obj)
 
+    if isinstance(obj, (tuple, set)):
+        obj = list(obj)
+
     return obj
 
 
 def generate_mutation():
     staged = Node._get_staged()
-    query = ['{', '\tset {']
+    # query = ['{', '\tset {']
+    query = list()
 
     for uid, node in staged.items():
         subject, passed = _parse_subject(uid)
 
         edges = node.edges
 
-        line = f'\t\t{subject} <{node.__class__.__name__}> "true" .'
+        line = f'{subject} <{node.__class__.__name__}> "true" .'
         query.append(line)
-        line = f'\t\t{subject} <_type> "{node.__class__.__name__}" .'
+        line = f'{subject} <_type> "{node.__class__.__name__}" .'
         query.append(line)
 
         for pred, obj in edges.items():
@@ -62,17 +71,20 @@ def generate_mutation():
                         facets.append(f'{facet}="{val}"')
                     o = o.obj
 
-                o = _make_obj(node, pred, o)
-
-                if facets:
-                    facets = ', '.join(facets)
-                    line = f'\t\t{subject} <{pred}> {o} ({facets}) .'
+                if not isinstance(o, (list, tuple, set)):
+                    out = [o]
                 else:
-                    line = f'\t\t{subject} <{pred}> {o} .'
-                query.append(line)
+                    out = o
 
-    query.append('\t}')
-    query.append('}')
+                for output in out:
+                    output = _make_obj(node, pred, output)
+
+                    if facets:
+                        facets = ', '.join(facets)
+                        line = f'{subject} <{pred}> {output} ({facets}) .'
+                    else:
+                        line = f'{subject} <{pred}> {output} .'
+                    query.append(line)
 
     query = '\n'.join(query)
 
@@ -97,3 +109,20 @@ def hydrate(data):
         output[func_name] = hydrated
 
     return output
+
+
+def run_mutation(mutation: str, client=None, *args, **kwargs):
+    MAX = 1_000
+    mutations = mutation.split('\n')
+    mutations = [mutations[i:i + MAX] for i in range(0, len(mutations), MAX)]
+    o = []
+    for m in mutations:
+        if client is None:
+            client = get_client()
+        transaction = client.txn()
+        try:
+            o.append(transaction.mutate(set_nquads='\n'.join(m)))
+            transaction.commit()
+        finally:
+            transaction.discard()
+    return o

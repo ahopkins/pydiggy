@@ -56,8 +56,9 @@ def _force_instance(directive, prop_type=None):
 
 class NodeMeta(type):
 
-    def __new__(cls, name, bases, attrs):
-        directives = [x for x in attrs if x in attrs.get('__annotations__').keys()]
+    def __new__(cls, name, bases, attrs, **kwargs):
+        directives = [x for x in attrs if x in attrs.get(
+            '__annotations__', {}).keys()]
         attrs['_directives'] = dict()
 
         for directive in directives:
@@ -79,7 +80,7 @@ class NodeMeta(type):
 
             attrs['_directives'][directive] = tuple(d)
 
-        return super().__new__(cls, name, bases, attrs)
+        return super().__new__(cls, name, bases, attrs, **kwargs)
 
 
 # @dataclass
@@ -171,12 +172,24 @@ class Node(metaclass=NodeMeta):
                 )
 
                 if prop_name in edges:
-                    if prop_type != edges.get(
-                        prop_name
-                    ) and not cls._is_node_type(prop_type[0]):
-                        raise ConflictingType(
-                            prop_name, prop_type, edges.get(prop_name)
-                        )
+                    if prop_type != edges.get(prop_name) and \
+                            not cls._is_node_type(prop_type[0]):
+
+                        if edges.get(prop_name).directives != prop_type.directives and \
+                                all((inspect.isclass(x) and issubclass(x, Directive)) or
+                                    issubclass(x.__class__, Directive) for x in edges.get(prop_name).directives) and \
+                                all((inspect.isclass(x) and issubclass(x, Directive)) or
+                                    issubclass(x.__class__, Directive) for x in prop_type.directives):
+                            pass
+                        else:
+                            raise ConflictingType(
+                                prop_name, prop_type, edges.get(prop_name)
+                            )
+
+                        print(edges.get(prop_name).prop_type, edges.get(
+                            prop_name).is_list_type, edges.get(prop_name).directives)
+                        print(prop_type.prop_type,
+                              prop_type.is_list_type, prop_type.directives)
 
                 if prop_type[0] in ACCEPTABLE_TRANSLATIONS:
                     edges[prop_name] = prop_type
