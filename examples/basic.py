@@ -26,7 +26,7 @@ class Region(Node):
     # __reverse__ = borders
 
 
-if __name__ == '__main__':
+if __name__ == "__main__":
     por = Region(name="Portugal")
     spa = Region(name="Spain")
     gas = Region(name="Gascony")
@@ -34,7 +34,7 @@ if __name__ == '__main__':
 
     por.borders = [spa]
     spa.borders = [por, gas, mar]
-    gas.borders = [Facets(spa, foo='bar', hello='world'), mar]
+    gas.borders = [Facets(spa, foo="bar", hello="world"), mar]
     mar.borders = [spa, gas]
 
     por.stage()

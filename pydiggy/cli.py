@@ -28,7 +28,7 @@ def flush(host, port):
     client = get_client(host=host, port=port)
     op = Operation(drop_all=True)
     client.alter(op)
-    click.echo('Done.')
+    click.echo("Done.")
 
 
 @main.command()
@@ -69,4 +69,4 @@ def generate(module, run, host, port):
 
         op = Operation(schema=schema)
         client.alter(op)
-        click.echo('Done.')
+        click.echo("Done.")

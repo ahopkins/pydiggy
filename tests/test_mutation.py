@@ -1,4 +1,5 @@
 from pydiggy import generate_mutation, Facets
+
 # import pytest
 
 
@@ -12,7 +13,7 @@ def test_mutations(RegionClass):
 
     por.borders = [spa]
     spa.borders = [por, gas, mar]
-    gas.borders = [Facets(spa, foo='bar', hello='world'), mar]
+    gas.borders = [Facets(spa, foo="bar", hello="world"), mar]
     mar.borders = [spa, gas]
 
     por.stage()
