@@ -186,11 +186,6 @@ class Node(metaclass=NodeMeta):
                                 prop_name, prop_type, edges.get(prop_name)
                             )
 
-                        print(edges.get(prop_name).prop_type, edges.get(
-                            prop_name).is_list_type, edges.get(prop_name).directives)
-                        print(prop_type.prop_type,
-                              prop_type.is_list_type, prop_type.directives)
-
                 if prop_type[0] in ACCEPTABLE_TRANSLATIONS:
                     edges[prop_name] = prop_type
                 elif cls._is_node_type(prop_type[0]):

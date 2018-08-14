@@ -91,12 +91,12 @@ def generate_mutation():
     return query
 
 
-def hydrate(data):
-    if not isinstance(data, dict) or 'data' not in data:
+def hydrate(data, data_set='data'):
+    if not isinstance(data, dict) or data_set not in data:
         raise InvalidData
 
     output = {}
-    data = data.get('data')
+    data = data.get(data_set)
     registered = {x.__name__: x for x in Node._nodes}
 
     for func_name, raw_data in data.items():
