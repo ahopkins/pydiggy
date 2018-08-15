@@ -13,10 +13,9 @@ class geo:
 
 
 class DirectiveArgument:
-
     @staticmethod
     def _clean_name(name):
-        if name.startswith('_'):
+        if name.startswith("_"):
             return name[1:]
         return name
 
@@ -26,10 +25,9 @@ class Tokenizer(DirectiveArgument):
 
 
 class Directive:
-
     def __str__(self):
         args = []
-        if '__annotations__' in self.__class__.__dict__:
+        if "__annotations__" in self.__class__.__dict__:
             for ann in self.__class__.__annotations__:
                 arg = getattr(self, ann, None)
                 if arg is None or not issubclass(arg, DirectiveArgument):
@@ -37,22 +35,22 @@ class Directive:
                 args.append(arg)
 
         if args:
-            arglist = ', '.join([a._clean_name(a.__name__) for a in args])
-            args = f'({arglist})'
+            arglist = ", ".join([a._clean_name(a.__name__) for a in args])
+            args = f"({arglist})"
         else:
-            args = ''
+            args = ""
 
-        return f'@{self.__class__.__name__}{args}'
+        return f"@{self.__class__.__name__}{args}"
 
 
-_hash = type('_hash', (Tokenizer, ), {})
-exact = type('exact', (Tokenizer, ), {})
-term = type('term', (Tokenizer, ), {})
-fulltext = type('fulltext', (Tokenizer, ), {})
-trigram = type('trigram', (Tokenizer, ), {})
-_int = type('_int', (Tokenizer, ), {})
-_float = type('_float', (Tokenizer, ), {})
-_bool = type('_bool', (Tokenizer, ), {})
+_hash = type("_hash", (Tokenizer,), {})
+exact = type("exact", (Tokenizer,), {})
+term = type("term", (Tokenizer,), {})
+fulltext = type("fulltext", (Tokenizer,), {})
+trigram = type("trigram", (Tokenizer,), {})
+_int = type("_int", (Tokenizer,), {})
+_float = type("_float", (Tokenizer,), {})
+_bool = type("_bool", (Tokenizer,), {})
 
 
 class index(Directive):
@@ -63,10 +61,10 @@ class index(Directive):
             self.tokenizer = tokenizer
 
 
-count = type('count', (Directive,), {})
-upsert = type('upsert', (Directive,), {})
-reverse = type('reverse', (Directive,), {})
-lang = type('lang', (Directive,), {})
+count = type("count", (Directive,), {})
+upsert = type("upsert", (Directive,), {})
+reverse = type("reverse", (Directive,), {})
+lang = type("lang", (Directive,), {})
 
 DGRAPH_TYPES = {  # Unsupported dgraph type: password, geo
     "uid": "uid",
@@ -82,8 +80,8 @@ DGRAPH_TYPES = {  # Unsupported dgraph type: password, geo
 ACCEPTABLE_TRANSLATIONS = (str, int, bool, float, datetime, Decimal, uid, geo)
 ACCEPTABLE_GENERIC_ALIASES = (list, tuple, Union)
 SELF_INSERTING_DIRECTIVE_ARGS = {
-    (index, 'int'): _int,
-    (index, 'float'): _float,
-    (index, 'bool'): _bool,
-    (index, 'geo'): geo,
+    (index, "int"): _int,
+    (index, "float"): _float,
+    (index, "bool"): _bool,
+    (index, "geo"): geo,
 }

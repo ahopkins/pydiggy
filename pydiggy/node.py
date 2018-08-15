@@ -10,6 +10,7 @@ from .types import SELF_INSERTING_DIRECTIVE_ARGS
 from .types import geo
 from .types import uid
 from .types import Directive
+from .types import reverse
 from collections import namedtuple
 from copy import deepcopy
 from dataclasses import dataclass
@@ -19,6 +20,7 @@ from decimal import Decimal
 from itertools import count
 from pydiggy.exceptions import ConflictingType
 from pydiggy.exceptions import InvalidData
+from pydiggy.exceptions import MissingAttribute
 from typing import Dict
 from typing import List
 from typing import Union
@@ -26,17 +28,20 @@ from typing import _GenericAlias
 from typing import get_type_hints
 
 
-PropType = namedtuple('PropType', ('prop_type', 'is_list_type', 'directives'))
+PropType = namedtuple("PropType", ("prop_type", "is_list_type", "directives"))
 
 
 def Facets(obj, **kwargs):
-    f = namedtuple('Facets', ['obj'] + list(kwargs.keys()))
+    f = namedtuple("Facets", ["obj"] + list(kwargs.keys()))
     return f(obj, *kwargs.values())
 
 
 def is_facets(node):
-    if isinstance(node, tuple) and hasattr(node, 'obj') and \
-            node.__class__.__name__ == 'Facets':
+    if (
+        isinstance(node, tuple)
+        and hasattr(node, "obj")
+        and node.__class__.__name__ == "Facets"
+    ):
         return True
     return False
 
@@ -55,30 +60,30 @@ def _force_instance(directive, prop_type=None):
 
 
 class NodeMeta(type):
-
     def __new__(cls, name, bases, attrs, **kwargs):
-        directives = [x for x in attrs if x in attrs.get(
-            '__annotations__', {}).keys()]
-        attrs['_directives'] = dict()
+        directives = [
+            x for x in attrs if x in attrs.get("__annotations__", {}).keys()
+        ]
+        attrs["_directives"] = dict()
 
         for directive in directives:
             d = copy.deepcopy(attrs.get(directive))
             attrs.pop(directive)
 
             if not isinstance(d, (list, tuple, set)):
-                d = (d, )
+                d = (d,)
 
             if not all(
-                (inspect.isclass(x) and issubclass(x, Directive)) or
-                issubclass(x.__class__, Directive)
+                (inspect.isclass(x) and issubclass(x, Directive))
+                or issubclass(x.__class__, Directive)
                 for x in d
             ):
                 continue
 
-            prop_type = attrs.get('__annotations__').get(directive)
+            prop_type = attrs.get("__annotations__").get(directive)
             d = map(lambda x: _force_instance(x, prop_type), d)
 
-            attrs['_directives'][directive] = tuple(d)
+            attrs["_directives"][directive] = tuple(d)
 
         return super().__new__(cls, name, bases, attrs, **kwargs)
 
@@ -121,7 +126,32 @@ class Node(metaclass=NodeMeta):
         #         setattr(self, pred, [])
 
     def __repr__(self):
-        return f'<{self.__class__.__name__}:{self.uid}>'
+        return f"<{self.__class__.__name__}:{self.uid}>"
+
+    def __getattr__(self, attribute):
+        if attribute in self.__annotations__:
+            raise MissingAttribute(attribute)
+        super().__getattribute__(attribute)
+
+    def __setattr__(self, name, value):
+        self.__dict__[name] = value
+        if name in self._directives \
+                and any(isinstance(d, reverse) for d in self._directives[name]):
+            reverse_name = f'_{name}'
+
+            # TODO:
+            # - Add tuple and set support
+            if isinstance(value, (list, )):
+                for item in value:
+                    if not hasattr(item, reverse_name):
+                        setattr(item, reverse_name, type(value)())
+                    item.__dict__[reverse_name].append(self)
+            else:
+                setattr(value, reverse_name, self)
+
+    @classmethod
+    def __reset(cls):
+        cls._i = count()
 
     @classmethod
     def _register_node(cls, node):
@@ -157,29 +187,50 @@ class Node(metaclass=NodeMeta):
                 #   predicate. If it is possible, then the solution may simply
                 #   be to loop over a list of deepcopy(annotations.items()),
                 #   and append all the __args__ to that list to extend the iteration
-                is_list_type = True if isinstance(prop_type, _GenericAlias) and \
-                    prop_type.__origin__ in (list, tuple, ) else False
+                is_list_type = (
+                    True
+                    if isinstance(prop_type, _GenericAlias)
+                    and prop_type.__origin__ in (list, tuple)
+                    else False
+                )
 
-                if isinstance(prop_type, _GenericAlias) and \
-                        prop_type.__origin__ in ACCEPTABLE_GENERIC_ALIASES:
+                if (
+                    isinstance(prop_type, _GenericAlias)
+                    and prop_type.__origin__ in ACCEPTABLE_GENERIC_ALIASES
+                ):
                     prop_type = prop_type.__args__[0]
 
                 # print(cls._directives)
                 prop_type = PropType(
-                    prop_type,
-                    is_list_type,
-                    node._directives.get(prop_name, [])
+                    prop_type, is_list_type, node._directives.get(
+                        prop_name, [])
                 )
 
                 if prop_name in edges:
-                    if prop_type != edges.get(prop_name) and \
-                            not cls._is_node_type(prop_type[0]):
+                    if prop_type != edges.get(
+                        prop_name
+                    ) and not cls._is_node_type(prop_type[0]):
 
-                        if edges.get(prop_name).directives != prop_type.directives and \
-                                all((inspect.isclass(x) and issubclass(x, Directive)) or
-                                    issubclass(x.__class__, Directive) for x in edges.get(prop_name).directives) and \
-                                all((inspect.isclass(x) and issubclass(x, Directive)) or
-                                    issubclass(x.__class__, Directive) for x in prop_type.directives):
+                        if (
+                            edges.get(prop_name).directives
+                            != prop_type.directives
+                            and all(
+                                (
+                                    inspect.isclass(x)
+                                    and issubclass(x, Directive)
+                                )
+                                or issubclass(x.__class__, Directive)
+                                for x in edges.get(prop_name).directives
+                            )
+                            and all(
+                                (
+                                    inspect.isclass(x)
+                                    and issubclass(x, Directive)
+                                )
+                                or issubclass(x.__class__, Directive)
+                                for x in prop_type.directives
+                            )
+                        ):
                             pass
                         else:
                             raise ConflictingType(
@@ -190,24 +241,31 @@ class Node(metaclass=NodeMeta):
                     edges[prop_name] = prop_type
                 elif cls._is_node_type(prop_type[0]):
                     edges[prop_name] = PropType(
-                        "uid",
-                        is_list_type,
-                        node._directives.get(prop_name, [])
+                        "uid", is_list_type, node._directives.get(
+                            prop_name, [])
                     )
                 else:
-                    if prop_name != 'uid':
-                        origin = getattr(prop_type[0], '__origin__', None)
+                    if prop_name != "uid":
+                        origin = getattr(prop_type[0], "__origin__", None)
                         # if origin and origin
                         unknown_schema.append(
-                            f"{prop_name}: {prop_type[0]} || {origin}")
+                            f"{prop_name}: {prop_type[0]} || {origin}"
+                        )
 
+        # <<<<<<< HEAD
+        #         for edge_name, (edge_type, is_list_type) in edges.items():
+        #             type_name = cls._get_type_name(edge_type)
+        #             # Currently, Dgraph does not support [uid] schema.
+        #             # See https://github.com/dgraph-io/dgraph/issues/2511
+        #             if is_list_type and type_name != 'uid':
+        # =======
         for edge_name, edge in edges.items():
             type_name = cls._get_type_name(edge.prop_type)
-            if edge.is_list_type and type_name != 'uid':
-                type_name = f'[{type_name}]'
+            if edge.is_list_type and type_name != "uid":
+                type_name = f"[{type_name}]"
 
             directives = edge.directives
-            directives = ' '.join([str(d) for d in directives] + [''])
+            directives = " ".join([str(d) for d in directives] + [""])
 
             edge_schema.append(f"{edge_name}: {type_name} {directives}.")
 
@@ -239,24 +297,20 @@ class Node(metaclass=NodeMeta):
     def _hydrate(cls, raw):
         registered = {x.__name__: x for x in Node._nodes}
 
-        if '_type' in raw and raw.get('_type') in registered:
-            if 'uid' not in raw:
-                raise InvalidData('Missing uid.')
+        if "_type" in raw and raw.get("_type") in registered:
+            if "uid" not in raw:
+                raise InvalidData("Missing uid.")
 
             keys = deepcopy(list(raw.keys()))
             facet_data = [
-                (key.split('|')[1], raw.pop(key))
-                for key in keys
-                if '|' in key
+                (key.split("|")[1], raw.pop(key)) for key in keys if "|" in key
             ]
 
-            kwargs = {
-                'uid': int(raw.pop('uid'), 16),
-            }
+            kwargs = {"uid": int(raw.pop("uid"), 16)}
 
             for pred, value in raw.items():
 
-                if not pred.startswith('_') and pred in cls.__annotations__:
+                if not pred.startswith("_") and pred in cls.__annotations__:
                     if isinstance(value, list):
                         value = [cls._hydrate(x) for x in value]
                     elif isinstance(value, dict):
@@ -279,13 +333,13 @@ class Node(metaclass=NodeMeta):
 
     def _generate_uid(self):
         i = next(self._i)
-        yield f'unsaved.{i}'
+        yield f"unsaved.{i}"
 
     def stage(self):
         self.edges = {}
 
         for arg, _ in self.__annotations__.items():
-            if not arg.startswith('_'):
+            if not arg.startswith("_"):
                 val = getattr(self, arg, None)
                 if val:
                     self.edges[arg] = val

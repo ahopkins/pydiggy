@@ -12,7 +12,7 @@ class Region(Node):
     borders: List[Region]
 
 
-if __name__ == '__main__':
+if __name__ == "__main__":
     por = Region(uid=0x11, name="Portugal")
     spa = Region(uid=0x12, name="Spain")
     gas = Region(uid=0x13, name="Gascony")
@@ -20,7 +20,7 @@ if __name__ == '__main__':
 
     por.borders = [spa]
     spa.borders = [por, gas, mar]
-    gas.borders = [Facets(spa, foo='bar', hello='world'), mar]
+    gas.borders = [Facets(spa, foo="bar", hello="world"), mar]
     mar.borders = [spa, gas]
 
     por.stage()

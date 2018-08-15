@@ -12,6 +12,7 @@ def RegionClass():
         population: int
         name: str
         borders: List[Region]
+
     return Region
 
 
@@ -23,12 +24,10 @@ def TypeTestClass():
         str_type: str
         bool_type: bool
         node_type: TypeClass
+
     return TypeClass
 
 
 @pytest.fixture
 def commands():
-    return [
-        'generate',
-        'flush',
-    ]
+    return ["generate", "flush"]
