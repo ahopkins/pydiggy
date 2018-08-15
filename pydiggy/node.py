@@ -137,17 +137,25 @@ class Node(metaclass=NodeMeta):
         self.__dict__[name] = value
         if name in self._directives \
                 and any(isinstance(d, reverse) for d in self._directives[name]):
-            reverse_name = f'_{name}'
+            directive = list(filter(lambda d: isinstance(
+                d, reverse), self._directives[name]))[0]
+            reverse_name = directive.name if directive.name else f'_{name}'
+
+            def _assign(obj, key, value, do_many):
+                if do_many:
+                    if not hasattr(obj, key):
+                        setattr(obj, key, list())
+                    obj.__dict__[key].append(value)
+                else:
+                    setattr(obj, key, value)
 
             # TODO:
             # - Add tuple and set support
             if isinstance(value, (list, )):
                 for item in value:
-                    if not hasattr(item, reverse_name):
-                        setattr(item, reverse_name, type(value)())
-                    item.__dict__[reverse_name].append(self)
+                    _assign(item, reverse_name, self, directive.many)
             else:
-                setattr(value, reverse_name, self)
+                _assign(value, reverse_name, self, directive.many)
 
     @classmethod
     def __reset(cls):

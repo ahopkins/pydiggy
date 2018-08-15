@@ -1,6 +1,7 @@
 from datetime import datetime
 from decimal import Decimal
 from typing import Union
+from typing import Optional
 from dataclasses import dataclass
 
 
@@ -57,13 +58,20 @@ class index(Directive):
     tokenizer: Union[_hash, exact, term, fulltext, trigram, _int, _float, _bool]
 
     def __init__(self, tokenizer=None):
-        if tokenizer:
-            self.tokenizer = tokenizer
+        self.tokenizer = tokenizer
+
+
+class reverse(Directive):
+    name: Optional[str]
+    many: bool
+
+    def __init__(self, name=None, many=False):
+        self.name = name
+        self.many = many
 
 
 count = type("count", (Directive,), {})
 upsert = type("upsert", (Directive,), {})
-reverse = type("reverse", (Directive,), {})
 lang = type("lang", (Directive,), {})
 
 DGRAPH_TYPES = {  # Unsupported dgraph type: password, geo

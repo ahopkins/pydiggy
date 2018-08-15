@@ -18,7 +18,20 @@ def test_reverse_normal():
     assert por == spa._borders
 
 
-def test_reverse_list():
+def test_reverse_list_many():
+    class Region(Node):
+        borders: List[Region] = reverse(many=True)
+
+    por = Region(uid=0x11, name="Portugal")
+    spa = Region(uid=0x12, name="Spain")
+
+    por.borders = [spa]
+
+    assert spa in por.borders
+    assert por in spa._borders
+
+
+def test_reverse_list_single():
     class Region(Node):
         borders: List[Region] = reverse
 
@@ -28,4 +41,31 @@ def test_reverse_list():
     por.borders = [spa]
 
     assert spa in por.borders
-    assert por in spa._borders
+    assert por == spa._borders
+
+
+def test_reverse_name():
+    class Person(Node):
+        parent: Person = reverse(name='child')
+
+    p = Person()
+    c = Person()
+
+    c.parent = p
+
+    assert p.child == c
+
+
+def test_reverse_name_many():
+    class Person(Node):
+        parent: Person = reverse(name='children', many=True)
+
+    p = Person()
+    c1 = Person()
+    c2 = Person()
+
+    c1.parent = p
+    c2.parent = p
+
+    assert c1 in p.children
+    assert c2 in p.children
