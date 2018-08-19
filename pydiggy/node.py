@@ -309,12 +309,15 @@ class Node(metaclass=NodeMeta):
             if "uid" not in raw:
                 raise InvalidData("Missing uid.")
 
+            k = registered[raw.get("_type")]
+
             keys = deepcopy(list(raw.keys()))
             facet_data = [
                 (key.split("|")[1], raw.pop(key)) for key in keys if "|" in key
             ]
 
             kwargs = {"uid": int(raw.pop("uid"), 16)}
+            delay = []
 
             for pred, value in raw.items():
 
@@ -325,8 +328,17 @@ class Node(metaclass=NodeMeta):
                         value = cls._hydrate(value)
                     if value:
                         kwargs.update({pred: value})
+                elif pred.startswith('~'):
+                    p = pred[1:]
+                    if isinstance(value, list):
+                        for x in value:
+                            delay.append((cls._hydrate(x), p))
+                    elif isinstance(value, dict):
+                        delay.append((cls._hydrate(x), p))
 
-            instance = cls(**kwargs)
+            instance = k(**kwargs)
+            for d, p in delay:
+                setattr(d, p, instance)
 
             if facet_data:
                 return Facets(instance, **dict(facet_data))

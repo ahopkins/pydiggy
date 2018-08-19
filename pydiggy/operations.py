@@ -112,9 +112,9 @@ def query(qry: str, client=None, *args, **kwargs):
     if client is None:
         client = get_client()
     result = client.query(qry, *args, **kwargs)
-    print(f'raw {result}')
+    # print(f'raw {result}')
     result = json.loads(result.json)
-    print(f'json {result}')
+    # print(f'json {result}')
     return hydrate(result)
 
 
@@ -128,6 +128,7 @@ def run_mutation(mutation: str, client=None, *args, **kwargs):
     for m in mutations:
         transaction = client.txn()
         try:
+            print(f'Running {len(m)}')
             o.append(transaction.mutate(set_nquads="\n".join(m)))
             transaction.commit()
         finally:

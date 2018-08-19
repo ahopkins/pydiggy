@@ -3,7 +3,7 @@ from decimal import Decimal
 from typing import Union
 from typing import Optional
 from dataclasses import dataclass
-
+from inspect import isclass
 
 class uid:
     pass
@@ -31,8 +31,10 @@ class Directive:
         if "__annotations__" in self.__class__.__dict__:
             for ann in self.__class__.__annotations__:
                 arg = getattr(self, ann, None)
-                if arg is None or not issubclass(arg, DirectiveArgument):
-                    raise Exception(arg)
+                if arg is None or not isclass(arg):
+                    continue
+                # if arg is None or not issubclass(arg, DirectiveArgument):
+                #     raise Exception(arg)
                 args.append(arg)
 
         if args:

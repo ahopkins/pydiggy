@@ -1,13 +1,13 @@
 from __future__ import annotations
 
 
-from pydiggy import Node, generate_mutation, Facets, hydrate, is_facets
+from pydiggy import Node, generate_mutation, Facets, hydrate, is_facets, reverse
 from typing import List
 import pytest
 
 
 @pytest.fixture
-def retrieved_data():
+def retrieved_data_simple():
     return {
         "allRegions": [
             {
@@ -64,14 +64,48 @@ def retrieved_data():
     }
 
 
-def test_hydration(retrieved_data):
+@pytest.fixture
+def retrieved_data_with_reverse():
+    return {
+        "map": [
+          {
+            "_type": "Map",
+            "uid": "0x691",
+            "~map": [
+                {
+                    "uid": "0x11",
+                    "_type": "Region",
+                    "name": "Portugal",
+                },
+                {
+                    "uid": "0x12",
+                    "_type": "Region",
+                    "name": "Spain",
+                },
+                {
+                    "uid": "0x13",
+                    "_type": "Region",
+                    "name": "Gascony",
+                },
+                {
+                    "uid": "0x14",
+                    "_type": "Region",
+                    "name": "Marseilles",
+                }
+            ]
+          }
+        ]
+      }
+
+
+def test_hydration(retrieved_data_simple):
     class Region(Node):
         area: int
         population: int
         name: str
         borders: List[Region]
 
-    data = hydrate(retrieved_data)
+    data = hydrate(retrieved_data_simple)
 
     assert "allRegions" in data
     assert len(data.get("allRegions")) == 4
@@ -98,3 +132,19 @@ def test_hydration(retrieved_data):
     assert h.borders[0].foo == "bar"
     assert h.borders[0].hello == "world"
     assert is_facets(h.borders[0])
+
+
+def test_hydration_reverse(retrieved_data_with_reverse):
+    class Map(Node):
+        pass
+
+    class Region(Node):
+        map: Map = reverse(name='territories', many=True)
+        name: str
+        borders: List[Region]
+
+    data = hydrate(retrieved_data_with_reverse)
+    m = data['map'][0]
+
+    assert m.territories
+    assert len(m.territories) == 4
