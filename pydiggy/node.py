@@ -65,6 +65,7 @@ class NodeMeta(type):
             x for x in attrs if x in attrs.get("__annotations__", {}).keys()
         ]
         attrs["_directives"] = dict()
+        attrs["_instances"] = list()
 
         for directive in directives:
             d = copy.deepcopy(attrs.get(directive))
@@ -111,6 +112,7 @@ class Node(metaclass=NodeMeta):
             if arg in self.__annotations__:
                 setattr(self, arg, val)
 
+        self.__class__._instances.append(self)
         # The following code looks to see if there are any typing.List
         # annotations. If yes, it auto creates an empty list.localns
         # This is probably not a feature worth including. Developer
@@ -155,7 +157,10 @@ class Node(metaclass=NodeMeta):
                 for item in value:
                     _assign(item, reverse_name, self, directive.many)
             else:
-                _assign(value, reverse_name, self, directive.many)
+                # TODO:
+                # Also, run a check that value is of type directive
+                if value is not None:
+                    _assign(value, reverse_name, self, directive.many)
 
     @classmethod
     def __reset(cls):
