@@ -3,6 +3,7 @@ from decimal import Decimal
 from typing import Union
 from typing import Optional
 from dataclasses import dataclass
+from inspect import isclass
 
 
 class uid:
@@ -31,13 +32,23 @@ class Directive:
         if "__annotations__" in self.__class__.__dict__:
             for ann in self.__class__.__annotations__:
                 arg = getattr(self, ann, None)
-                if arg is None or not issubclass(arg, DirectiveArgument):
-                    raise Exception(arg)
+                # if not isclass(arg):
+                #     raise Exception(self.__class__, ann, arg)
+                #     arg = arg.__class__
+                # if arg is None or not issubclass(arg, DirectiveArgument):
+                #     raise Exception(arg)
                 args.append(arg)
 
         if args:
-            arglist = ", ".join([a._clean_name(a.__name__) for a in args])
-            args = f"({arglist})"
+            arglist = ", ".join([
+                a._clean_name(a.__name__)
+                for a in args
+                if isclass(a) and issubclass(a, DirectiveArgument)
+            ])
+            if len(arglist) > 0:
+                args = f"({arglist})"
+            else:
+                args = ""
         else:
             args = ""
 
