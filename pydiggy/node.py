@@ -219,7 +219,8 @@ class Node(metaclass=NodeMeta):
                 ):
                     prop_type = prop_type.__args__[0]
 
-                # print(cls._directives)
+                # if node.__name__ == 'Character':
+                #     print(node._directives)
                 prop_type = PropType(
                     prop_type, is_list_type, node._directives.get(
                         prop_name, [])
@@ -356,7 +357,7 @@ class Node(metaclass=NodeMeta):
                     elif isinstance(value, dict):
                         value = cls._hydrate(value)
 
-                    if value:
+                    if value is not None:
                         kwargs.update({pred: value})
                 elif pred.startswith('~'):
                     p = pred[1:]
@@ -402,7 +403,6 @@ class Node(metaclass=NodeMeta):
                 if not hasattr(instance, prop):
                     raise Exception(f'{instance} does not have {prop}')
                 data.append((prop, getattr(instance, prop, None)))
-        print(data)
         for key, value in data:
             if key in instance.__class__.__annotations__.keys() \
                     or key == 'uid' \
@@ -416,6 +416,9 @@ class Node(metaclass=NodeMeta):
                                                 max_depth=max_depth)
                     else:
                         obj[key] = str(value)
+                elif isinstance(value, (list, )):
+                    obj[key] = [cls._explode(x, depth=(depth + 1),
+                                             max_depth=max_depth) for x in value]
         return obj
 
     @staticmethod
@@ -436,7 +439,7 @@ class Node(metaclass=NodeMeta):
         for arg, _ in self.__annotations__.items():
             if not arg.startswith("_"):
                 val = getattr(self, arg, None)
-                if val:
+                if val is not None:
                     self.edges[arg] = val
         self._staged[self.uid] = self
 
