@@ -5,6 +5,7 @@ from typing import Optional
 from dataclasses import dataclass
 from inspect import isclass
 
+
 class uid:
     pass
 

@@ -3,7 +3,7 @@ from pydiggy.exceptions import NotStaged, InvalidData
 from typing import get_type_hints, List, Union, Tuple
 from pydiggy.types import *  # noqa
 from pydiggy.connection import get_client
-import json
+import json as _json
 
 
 def _parse_subject(uid):
@@ -136,14 +136,24 @@ def hydrate(data):
     return output
 
 
-def query(qry: str, client=None, *args, **kwargs):
+def query(qry: str, client=None, raw=False, json=False, *args, **kwargs):
     if client is None:
-        client = get_client()
-    result = client.query(qry, *args, **kwargs)
-    # print(f'raw {result}')
-    result = json.loads(result.json)
-    # print(f'json {result}')
-    return hydrate(result)
+        client = get_client(**kwargs)
+        if 'host' in kwargs:
+            kwargs.pop('host')
+        if 'port' in kwargs:
+            kwargs.pop('port')
+    raw_data = client.query(qry, *args, **kwargs)
+    json_data = _json.loads(raw_data.json)
+    output = hydrate(json_data)
+
+    if raw:
+        output['raw'] = raw_data
+
+    if json:
+        output['json'] = json_data
+
+    return output
 
 
 def run_mutation(mutation: str, client=None, *args, **kwargs):

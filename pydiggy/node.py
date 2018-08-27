@@ -18,6 +18,7 @@ from dataclasses import field
 from datetime import datetime
 from decimal import Decimal
 from itertools import count
+from functools import partial
 from pydiggy.exceptions import ConflictingType
 from pydiggy.exceptions import InvalidData
 from pydiggy.exceptions import MissingAttribute
@@ -59,13 +60,18 @@ def _force_instance(directive, prop_type=None):
     return directive(*args)
 
 
+def get_node(name):
+    registered = {x.__name__: x for x in Node._nodes}
+    return registered.get(name, None)
+
+
 class NodeMeta(type):
     def __new__(cls, name, bases, attrs, **kwargs):
         directives = [
             x for x in attrs if x in attrs.get("__annotations__", {}).keys()
         ]
         attrs["_directives"] = dict()
-        attrs["_instances"] = list()
+        attrs["_instances"] = dict()
 
         for directive in directives:
             d = copy.deepcopy(attrs.get(directive))
@@ -112,7 +118,7 @@ class Node(metaclass=NodeMeta):
             if arg in self.__annotations__:
                 setattr(self, arg, val)
 
-        self.__class__._instances.append(self)
+        self.__class__._instances.update({self.uid: self})
         # The following code looks to see if there are any typing.List
         # annotations. If yes, it auto creates an empty list.localns
         # This is probably not a feature worth including. Developer
@@ -325,22 +331,40 @@ class Node(metaclass=NodeMeta):
             delay = []
 
             for pred, value in raw.items():
-
                 if not pred.startswith("_") and pred in cls.__annotations__:
                     if isinstance(value, list):
-                        value = [cls._hydrate(x) for x in value]
+                        prop_type = cls.__annotations__[pred]
+                        is_list_type = (
+                            True
+                            if isinstance(prop_type, _GenericAlias)
+                            and prop_type.__origin__ in (list, tuple)
+                            else False
+                        )
+                        if is_list_type:
+                            value = [cls._hydrate(x) for x in value]
+                        else:
+                            if len(value) > 1:
+                                # This should NOT happen. Because uid
+                                # in dgraph is not forced 1:1 with a uid predicate
+                                # it should return as a [<Node>] with only
+                                # a single item in it. If the developer wants
+                                # multiple: then the Node definition should
+                                # be List[MyNode]
+                                raise Exception('Unknown data')
+                            value = get_node(value[0].get(
+                                '_type'))._hydrate(value[0])
                     elif isinstance(value, dict):
                         value = cls._hydrate(value)
+
                     if value:
                         kwargs.update({pred: value})
                 elif pred.startswith('~'):
                     p = pred[1:]
                     if isinstance(value, list):
                         for x in value:
-                            delay.append((cls._hydrate(x), p))
+                            delay.append((get_node(x.get('_type'))._hydrate(x), p))
                     elif isinstance(value, dict):
-                        delay.append((cls._hydrate(x), p))
-
+                        delay.append((get_node(value.get('_type'))._hydrate(value), p))
             instance = k(**kwargs)
             for d, p in delay:
                 setattr(d, p, instance)
@@ -351,6 +375,49 @@ class Node(metaclass=NodeMeta):
                 return instance
         return None
 
+    @classmethod
+    def json(cls):
+        # print([(x.__name__, len(x._instances)) for x in cls._nodes])
+        return {
+            x.__name__: list(
+                map(partial(cls._explode, max_depth=0), x._instances.values()))
+            for x in cls._nodes
+            if len(x._instances) > 0
+        }
+
+    @classmethod
+    def _explode(cls, instance, max_depth=None, depth=0, include=None):
+        obj = {'_type': instance.__class__.__name__}
+
+        if not isinstance(instance, Node):
+            raise Exception('Cannot explode a non-Node object')
+
+        # TODO:
+        # - This explode implementation IGNORES Facets right now when unfolding
+        #   a nexted object. Needs to look for instance of Node or Facets and
+        #   handle both.
+        data = list(instance.__dict__.items())
+        if include:
+            for prop in include:
+                if not hasattr(instance, prop):
+                    raise Exception(f'{instance} does not have {prop}')
+                data.append((prop, getattr(instance, prop, None)))
+        print(data)
+        for key, value in data:
+            if key in instance.__class__.__annotations__.keys() \
+                    or key == 'uid' \
+                    or (include and key in include):
+                if isinstance(value, (str, int, float, bool)):
+                    obj[key] = value
+                elif isinstance(value, Node):
+                    explode = depth < max_depth if max_depth is not None else True
+                    if explode:
+                        obj[key] = cls._explode(value, depth=(depth + 1),
+                                                max_depth=max_depth)
+                    else:
+                        obj[key] = str(value)
+        return obj
+
     @staticmethod
     def _is_node_type(cls):
         """Check if a class is a <class 'Node'>"""
@@ -359,6 +426,9 @@ class Node(metaclass=NodeMeta):
     def _generate_uid(self):
         i = next(self._i)
         yield f"unsaved.{i}"
+
+    def to_json(self, include=None):
+        return self.__class__._explode(self, include=include)
 
     def stage(self):
         self.edges = {}
