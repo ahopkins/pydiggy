@@ -349,9 +349,10 @@ class Node(metaclass=NodeMeta):
             pred_items = [(pred, value) for pred, value in raw.items() if not pred.startswith("_")]
 
             for pred, value in pred_items:
-                if pred in cls.__annotations__:
+                annotations = get_type_hints(k)
+                if pred in annotations:
                     if isinstance(value, list):
-                        prop_type = cls.__annotations__[pred]
+                        prop_type = annotations[pred]
                         is_list_type = (
                             True
                             if isinstance(prop_type, _GenericAlias)
@@ -393,7 +394,8 @@ class Node(metaclass=NodeMeta):
                 instance.computed = Computed(**computed)
 
             if facet_data:
-                return Facets(instance, **dict(facet_data))
+                facets = Facets(instance, **dict(facet_data))
+                return facets
             else:
                 return instance
         return None
@@ -413,6 +415,8 @@ class Node(metaclass=NodeMeta):
         obj = {'_type': instance.__class__.__name__}
 
         if not isinstance(instance, Node):
+            if is_facets(instance):
+                return instance._asdict()
             raise Exception('Cannot explode a non-Node object')
 
         # TODO:
@@ -445,6 +449,23 @@ class Node(metaclass=NodeMeta):
                                              max_depth=max_depth) for x in value]
                 elif is_computed(value):
                     obj.update(value._asdict())
+                elif is_facets(value):
+                    annotations = get_type_hints(cls)
+                    prop_type = annotations[key]
+                    is_list_type = (
+                        True
+                        if isinstance(prop_type, _GenericAlias)
+                        and prop_type.__origin__ in (list, tuple)
+                        else False
+                    )
+                    if is_list_type:
+                        if key not in obj:
+                            obj[key] = []
+                        obj[key].append(value._asdict())
+                    else:
+                        item = value._asdict()
+                        item.update({'is_facets': True})
+                        obj[key] = value._asdict()
         return obj
 
     @staticmethod
