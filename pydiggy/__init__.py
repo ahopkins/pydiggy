@@ -9,6 +9,7 @@ __version__ = "0.1.0"
 from pydiggy.node import Node
 from pydiggy.node import Facets
 from pydiggy.node import is_facets
+from pydiggy.node import get_node
 from pydiggy.operations import generate_mutation, hydrate, run_mutation, query
 from .types import uid
 from .types import geo
@@ -26,6 +27,7 @@ __all__ = (
     "Facets",
     "generate_mutation",
     "geo",
+    "get_node",
     "hydrate",
     "is_facets",
     "index",
