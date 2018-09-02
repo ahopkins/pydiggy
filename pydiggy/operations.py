@@ -3,38 +3,10 @@ from pydiggy.exceptions import NotStaged, InvalidData
 from typing import get_type_hints, List, Union, Tuple
 from pydiggy.types import *  # noqa
 from pydiggy.connection import get_client
+from pydiggy.utils import _parse_subject
+from pydiggy.utils import _rdf_value
+from pydiggy.utils import _raw_value
 import json as _json
-
-
-def _parse_subject(uid):
-    if isinstance(uid, int):
-        return f"<{hex(uid)}>", uid
-    else:
-        return f"_:{uid}", uid
-
-
-def _rdf_value(value):
-    if isinstance(value, str):
-        value = f'"{value}"'
-    elif isinstance(value, bool):
-        value = f'"{str(value).lower()}"'
-    elif isinstance(value, int):
-        value = f'"{int(value)}"^^<xs:int>'
-    elif isinstance(value, float):
-        value = f'"{value}"^^<xs:float>'
-    return value
-
-
-def _raw_value(value):
-    if isinstance(value, str):
-        value = f'"{value}"'
-    elif isinstance(value, bool):
-        value = f'{str(value).lower()}'
-    elif isinstance(value, int):
-        value = f'{int(value)}'
-    elif isinstance(value, float):
-        value = f'{value}'
-    return value
 
 
 def _make_obj(node, pred, obj):

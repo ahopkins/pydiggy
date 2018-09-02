@@ -22,9 +22,14 @@ from functools import partial
 from pydiggy.exceptions import ConflictingType
 from pydiggy.exceptions import InvalidData
 from pydiggy.exceptions import MissingAttribute
+from pydiggy.connection import get_client
+from pydiggy.utils import _parse_subject
+from pydiggy.utils import _rdf_value
+from pydiggy.utils import _raw_value
 from typing import Dict
 from typing import List
 from typing import Union
+from typing import Tuple
 from typing import _GenericAlias
 from typing import get_type_hints
 
@@ -127,12 +132,14 @@ class Node(metaclass=NodeMeta):
             uid = next(self._generate_uid())
 
         self.uid = uid
+        self._dirty = set()
 
         for arg, val in kwargs.items():
             if arg in self.__annotations__:
                 setattr(self, arg, val)
 
         self.__class__._instances.update({self.uid: self})
+        self._init = True
         # The following code looks to see if there are any typing.List
         # annotations. If yes, it auto creates an empty list.localns
         # This is probably not a feature worth including. Developer
@@ -157,6 +164,8 @@ class Node(metaclass=NodeMeta):
 
     def __setattr__(self, name, value):
         self.__dict__[name] = value
+        if hasattr(self, '_init') and self._init and not name.startswith('_'):
+            self._dirty.add(name)
         if name in self._directives \
                 and any(isinstance(d, reverse) for d in self._directives[name]):
             directive = list(filter(lambda d: isinstance(
@@ -490,5 +499,78 @@ class Node(metaclass=NodeMeta):
                     self.edges[arg] = val
         self._staged[self.uid] = self
 
-    def save(self):
-        pass
+    def save(self, client=None, host=None, port=None):
+        def _make_obj(node, pred, obj):
+            localns = {x.__name__: x for x in Node._nodes}
+            localns.update({"List": List, "Union": Union, "Tuple": Tuple})
+            annotations = get_type_hints(node, globalns=globals(), localns=localns)
+            annotation = annotations.get(pred, "")
+            if hasattr(annotation, "__origin__") and annotation.__origin__ == list:
+                annotation = annotation.__args__[0]
+
+            try:
+                if annotation == str:
+                    obj = f'"{obj}"'
+                elif annotation == bool:
+                    obj = f'"{str(obj).lower()}"'
+                elif annotation in (int,):
+                    obj = f'"{int(obj)}"^^<xs:int>'
+                elif annotation in (float,) or isinstance(obj, float):
+                    obj = f'"{obj}"^^<xs:float>'
+                elif Node._is_node_type(obj.__class__):
+                    obj, passed = _parse_subject(obj.uid)
+                    staged = Node._get_staged()
+
+                    if obj not in staged and passed not in staged and not isinstance(passed, int):
+                        raise NotStaged(f'<{node.__class__.__name__} {pred}={obj}>')
+            except ValueError:
+                raise ValueError(f'Incorrect value type. Received <{node.__class__.__name__} {pred}={obj}>. Expecting <{node.__class__.__name__} {pred}={annotation.__name__}>')
+
+            if isinstance(obj, (tuple, set)):
+                obj = list(obj)
+
+            return obj
+
+        query = []
+        for pred in self._dirty:
+            obj = getattr(self, pred)
+            subject, passed = _parse_subject(self.uid)
+            if not isinstance(obj, list):
+                obj = [obj]
+
+            for o in obj:
+                facets = []
+                if is_facets(o):
+                    for facet in o.__class__._fields[1:]:
+                        val = _raw_value(getattr(o, facet))
+                        facets.append(f'{facet}={val}')
+                    o = o.obj
+
+                if not isinstance(o, (list, tuple, set)):
+                    out = [o]
+                else:
+                    out = o
+
+                for output in out:
+                    output = _make_obj(self, pred, output)
+
+                    if facets:
+                        facets = ", ".join(facets)
+                        line = f"{subject} <{pred}> {output} ({facets}) ."
+                    else:
+                        line = f"{subject} <{pred}> {output} ."
+                    query.append(line)
+
+        mutation = '\n'.join(query)
+        print(mutation)
+        if client is None:
+            client = get_client(host=host, port=9080)
+        print(mutation)
+        transaction = client.txn()
+        print(transaction)
+        print(dir(client))
+        try:
+            o = transaction.mutate(set_nquads=mutation)
+            transaction.commit()
+        finally:
+            transaction.discard()
