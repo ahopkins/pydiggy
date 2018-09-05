@@ -1,6 +1,6 @@
-**IMPORTANT NOTICE: This project is being put on hold. Not because I do not believe in it or think it is without use, but because dgraph is released under a _RESTRICTIVE_ license that is not compatible with open source. Until this changes, there will be no further work on this package.**
+**IMPORTANT NOTICE: This project is being put on hold. Not because I do not believe in it or think it is without use, but because dgraph is released under a RESTRICTIVE license that is not compatible with open source. Until this changes, there will be no further work on this package.**
 
-`Read more<https://discuss.dgraph.io/t/switching-dgraph-to-a-liberal-license-dgraph-blog/2411>`_
+`Read more <https://discuss.dgraph.io/t/switching-dgraph-to-a-liberal-license-dgraph-blog/2411>`_
 
 
 =======
