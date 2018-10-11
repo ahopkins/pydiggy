@@ -2,6 +2,8 @@
 
 `Read more <https://discuss.dgraph.io/t/switching-dgraph-to-a-liberal-license-dgraph-blog/2411>`_
 
+**UPDATE 2018-10-11** The dgraph team `has decided <https://discuss.dgraph.io/t/common-clause-on-license-dgraph-is-not-open-source/3167/31?u=ahopkins>`_ to `switch back to Apache 2.0 <https://github.com/dgraph-io/dgraph/commit/3d0b2cd84f04b263f6c5128e682a63be8dcb220d>`_. I am excited to hear that and will resume working on this project soon.
+
 
 =======
 PyDiggy
