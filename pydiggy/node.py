@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import inspect
 import copy
+import json
 
 from .types import ACCEPTABLE_GENERIC_ALIASES
 from .types import ACCEPTABLE_TRANSLATIONS
@@ -30,8 +31,10 @@ from typing import Dict
 from typing import List
 from typing import Union
 from typing import Tuple
+from typing import Optional
 from typing import _GenericAlias
 from typing import get_type_hints
+from enum import Enum
 
 
 PropType = namedtuple("PropType", ("prop_type", "is_list_type", "directives"))
@@ -92,6 +95,9 @@ class NodeMeta(type):
         attrs["_directives"] = dict()
         attrs["_instances"] = dict()
 
+        for base in bases:
+            attrs["_directives"].update(base._directives)
+
         for directive in directives:
             d = copy.deepcopy(attrs.get(directive))
             attrs.pop(directive)
@@ -134,8 +140,10 @@ class Node(metaclass=NodeMeta):
         self.uid = uid
         self._dirty = set()
 
+        self._annotations = get_type_hints(self.__class__)
+
         for arg, val in kwargs.items():
-            if arg in self.__annotations__:
+            if arg in self._annotations:
                 setattr(self, arg, val)
 
         self.__class__._instances.update({self.uid: self})
@@ -173,17 +181,26 @@ class Node(metaclass=NodeMeta):
             reverse_name = directive.name if directive.name else f'_{name}'
 
             def _assign(obj, key, value, do_many):
+                o = obj.obj if is_facets(obj) else obj
+
+                if is_facets(obj):
+                    props = obj._asdict()
+                    props['obj'] = value
+                    value = Facets(**props)
+
                 if do_many:
-                    if not hasattr(obj, key):
-                        setattr(obj, key, list())
-                    obj.__dict__[key].append(value)
+                    if not hasattr(o, key):
+                        setattr(o, key, list())
+                    o.__dict__[key].append(value)
                 else:
-                    setattr(obj, key, value)
+                    setattr(o, key, value)
 
             # TODO:
             # - Add tuple and set support
             if isinstance(value, (list, )):
                 for item in value:
+                    if is_facets(item):
+                        item = item.obj
                     _assign(item, reverse_name, self, directive.many)
             else:
                 # TODO:
@@ -242,8 +259,6 @@ class Node(metaclass=NodeMeta):
                 ):
                     prop_type = prop_type.__args__[0]
 
-                # if node.__name__ == 'Character':
-                #     print(node._directives)
                 prop_type = PropType(
                     prop_type, is_list_type, node._directives.get(
                         prop_name, [])
@@ -337,6 +352,11 @@ class Node(metaclass=NodeMeta):
         return cls._staged
 
     @classmethod
+    def _clear_staged(cls):
+        cls._staged = {}
+        cls._i = count()
+
+    @classmethod
     def _hydrate(cls, raw):
         registered = {x.__name__: x for x in Node._nodes}
 
@@ -357,8 +377,8 @@ class Node(metaclass=NodeMeta):
 
             pred_items = [(pred, value) for pred, value in raw.items() if not pred.startswith("_")]
 
+            annotations = get_type_hints(k)
             for pred, value in pred_items:
-                annotations = get_type_hints(k)
                 if pred in annotations:
                     if isinstance(value, list):
                         prop_type = annotations[pred]
@@ -379,8 +399,8 @@ class Node(metaclass=NodeMeta):
                                 # multiple: then the Node definition should
                                 # be List[MyNode]
                                 raise Exception('Unknown data')
-                            value = get_node(value[0].get(
-                                '_type'))._hydrate(value[0])
+                            node = get_node(value[0].get('_type'))
+                            value = node._hydrate(value[0])
                     elif isinstance(value, dict):
                         value = cls._hydrate(value)
 
@@ -390,14 +410,29 @@ class Node(metaclass=NodeMeta):
                     p = pred[1:]
                     if isinstance(value, list):
                         for x in value:
-                            delay.append((get_node(x.get('_type'))._hydrate(x), p))
+                            keys = deepcopy(list(x.keys()))
+                            value_facet_data = [
+                                (k.split("|")[1], x.pop(k)) for k in keys if "|" in k
+                            ]
+                            item = get_node(x.get('_type'))._hydrate(x)
+
+                            if value_facet_data:
+                                item = Facets(item, **dict(value_facet_data))
+                            delay.append((item, p, value_facet_data))
                     elif isinstance(value, dict):
-                        delay.append((get_node(value.get('_type'))._hydrate(value), p))
+                        delay.append((get_node(value.get('_type'))._hydrate(value), p, None))
                 else:
+                    if pred.endswith('_uid'):
+                        value = int(value, 16)
                     computed.update({pred: value})
+
             instance = k(**kwargs)
-            for d, p in delay:
-                setattr(d, p, instance)
+            for d, p, v in delay:
+                if is_facets(d):
+                    f = Facets(instance, **dict(v))
+                    setattr(d.obj, p, f)
+                else:
+                    setattr(d, p, instance)
 
             if computed:
                 instance.computed = Computed(**computed)
@@ -411,7 +446,6 @@ class Node(metaclass=NodeMeta):
 
     @classmethod
     def json(cls):
-        # print([(x.__name__, len(x._instances)) for x in cls._nodes])
         return {
             x.__name__: list(
                 map(partial(cls._explode, max_depth=0), x._instances.values()))
@@ -423,30 +457,30 @@ class Node(metaclass=NodeMeta):
     def _explode(cls, instance, max_depth=None, depth=0, include=None):
         obj = {'_type': instance.__class__.__name__}
 
-        if not isinstance(instance, Node):
+        if not isinstance(instance, Node) and not is_facets(instance):
             if is_facets(instance):
                 return instance._asdict()
             raise Exception('Cannot explode a non-Node object')
 
-        # TODO:
-        # - This explode implementation IGNORES Facets right now when unfolding
-        #   a nexted object. Needs to look for instance of Node or Facets and
-        #   handle both.
-        data = list(instance.__dict__.items())
+        if is_facets(instance):
+            data = list(instance._asdict().items())
+        else:
+            data = list(instance.__dict__.items())
         if include:
             for prop in include:
-                # if not hasattr(instance, prop):
-                #     raise Exception(f'{instance} does not have {prop}')
                 data.append((prop, getattr(instance, prop, None)))
 
         data = filter(lambda x: x[1] is not None, data)
+
+        annotations = get_type_hints(instance.__class__)
         for key, value in data:
-            if key in instance.__class__.__annotations__.keys() \
+            if is_facets(instance) \
+                    or key in annotations.keys() \
                     or key == 'uid' \
                     or (include and key in include):
                 if isinstance(value, (str, int, float, bool)):
                     obj[key] = value
-                elif isinstance(value, Node):
+                elif issubclass(value.__class__, Node):
                     explode = depth < max_depth if max_depth is not None else True
                     if explode:
                         obj[key] = cls._explode(value, depth=(depth + 1),
@@ -457,9 +491,8 @@ class Node(metaclass=NodeMeta):
                     obj[key] = [cls._explode(x, depth=(depth + 1),
                                              max_depth=max_depth) for x in value]
                 elif is_computed(value):
-                    obj.update(value._asdict())
+                    obj.update({key: value._asdict()})
                 elif is_facets(value):
-                    annotations = get_type_hints(cls)
                     prop_type = annotations[key]
                     is_list_type = (
                         True
@@ -477,6 +510,13 @@ class Node(metaclass=NodeMeta):
                         obj[key] = value._asdict()
         return obj
 
+    @classmethod
+    def create(cls, **kwargs):
+        instance = cls()
+        for k, v in kwargs.items():
+            setattr(instance, k, v)
+        return instance
+
     @staticmethod
     def _is_node_type(cls):
         """Check if a class is a <class 'Node'>"""
@@ -492,18 +532,22 @@ class Node(metaclass=NodeMeta):
     def stage(self):
         self.edges = {}
 
-        for arg, _ in self.__annotations__.items():
-            if not arg.startswith("_"):
+        for arg, _ in self._annotations.items():
+            if not arg.startswith("_") and arg != "uid":
                 val = getattr(self, arg, None)
                 if val is not None:
                     self.edges[arg] = val
         self._staged[self.uid] = self
 
     def save(self, client=None, host=None, port=None):
+        localns = {x.__name__: x for x in Node._nodes}
+        localns.update({"List": List, "Union": Union, "Tuple": Tuple})
+        annotations = get_type_hints(self, globalns=globals(), localns=localns)
+
+        if client is None:
+            client = get_client(host=host, port=9080)
+
         def _make_obj(node, pred, obj):
-            localns = {x.__name__: x for x in Node._nodes}
-            localns.update({"List": List, "Union": Union, "Tuple": Tuple})
-            annotations = get_type_hints(node, globalns=globals(), localns=localns)
             annotation = annotations.get(pred, "")
             if hasattr(annotation, "__origin__") and annotation.__origin__ == list:
                 annotation = annotation.__args__[0]
@@ -531,14 +575,24 @@ class Node(metaclass=NodeMeta):
 
             return obj
 
-        query = []
-        for pred in self._dirty:
+        setters = []
+        deleters = []
+
+        saveable = (
+            x for x in self._dirty
+            if x != 'computed' and x in annotations
+        )
+
+        for pred in saveable:
             obj = getattr(self, pred)
             subject, passed = _parse_subject(self.uid)
             if not isinstance(obj, list):
                 obj = [obj]
 
             for o in obj:
+                if issubclass(o.__class__, Enum):
+                    o = o.value
+
                 facets = []
                 if is_facets(o):
                     for facet in o.__class__._fields[1:]:
@@ -552,25 +606,48 @@ class Node(metaclass=NodeMeta):
                     out = o
 
                 for output in out:
+                    if output is None:
+                        line = f"{subject} <{pred}> * ."
+                        deleters.append(line)
+                        continue
+
+                    is_node_type = self._is_node_type(output.__class__)
                     output = _make_obj(self, pred, output)
+
+                    # Temporary measure until dgraph 1.1 with 1:1 uid
+                    if is_node_type:
+                        prop_type = annotations[pred]
+                        is_list_type = (
+                            True
+                            if isinstance(prop_type, _GenericAlias)
+                            and prop_type.__origin__ in (list, tuple)
+                            else False
+                        )
+                        if not is_list_type:
+                            line = f"{subject} <{pred}> * ."
+                            transaction = client.txn()
+                            try:
+                                transaction.mutate(del_nquads=line)
+                                transaction.commit()
+                            finally:
+                                transaction.discard()
 
                     if facets:
                         facets = ", ".join(facets)
                         line = f"{subject} <{pred}> {output} ({facets}) ."
                     else:
                         line = f"{subject} <{pred}> {output} ."
-                    query.append(line)
+                    setters.append(line)
 
-        mutation = '\n'.join(query)
-        print(mutation)
-        if client is None:
-            client = get_client(host=host, port=9080)
-        print(mutation)
+        set_mutations = '\n'.join(setters)
+        delete_mutations = '\n'.join(deleters)
         transaction = client.txn()
-        print(transaction)
-        print(dir(client))
+        print('set', set_mutations)
+        print('delete', delete_mutations)
+
         try:
-            o = transaction.mutate(set_nquads=mutation)
-            transaction.commit()
+            if set_mutations or delete_mutations:
+                o = transaction.mutate(set_nquads=set_mutations, del_nquads=delete_mutations)
+                transaction.commit()
         finally:
             transaction.discard()

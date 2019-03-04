@@ -6,7 +6,10 @@ from pydiggy.connection import get_client
 from pydiggy.utils import _parse_subject
 from pydiggy.utils import _rdf_value
 from pydiggy.utils import _raw_value
+from typing import _GenericAlias
 import json as _json
+from datetime import datetime
+from enum import Enum
 
 
 def _make_obj(node, pred, obj):
@@ -17,21 +20,26 @@ def _make_obj(node, pred, obj):
     if hasattr(annotation, "__origin__") and annotation.__origin__ == list:
         annotation = annotation.__args__[0]
 
+    if issubclass(obj.__class__, Enum):
+        obj = obj.value
+
     try:
-        if annotation == str:
-            obj = f'"{obj}"'
+        if Node._is_node_type(obj.__class__):
+            obj, passed = _parse_subject(obj.uid)
+            staged = Node._get_staged()
+
+            if obj not in staged and passed not in staged and not isinstance(passed, int):
+                raise NotStaged(f'<{node.__class__.__name__} {pred}={obj}>')
         elif annotation == bool:
             obj = f'"{str(obj).lower()}"'
         elif annotation in (int,):
             obj = f'"{int(obj)}"^^<xs:int>'
         elif annotation in (float,) or isinstance(obj, float):
             obj = f'"{obj}"^^<xs:float>'
-        elif Node._is_node_type(obj.__class__):
-            obj, passed = _parse_subject(obj.uid)
-            staged = Node._get_staged()
-
-            if obj not in staged and passed not in staged and not isinstance(passed, int):
-                raise NotStaged(f'<{node.__class__.__name__} {pred}={obj}>')
+        elif isinstance(obj, datetime):
+            obj = f'"{obj.isoformat()}"'
+        else:
+            obj = f'"{obj}"'
     except ValueError:
         raise ValueError(f'Incorrect value type. Received <{node.__class__.__name__} {pred}={obj}>. Expecting <{node.__class__.__name__} {pred}={annotation.__name__}>')
 
@@ -43,6 +51,10 @@ def _make_obj(node, pred, obj):
 
 def generate_mutation():
     staged = Node._get_staged()
+    localns = {x.__name__: x for x in Node._nodes}
+    localns.update({"List": List, "Union": Union, "Tuple": Tuple})
+    # annotations = get_type_hints(Node, globalns=globals(), localns=localns)
+
     # query = ['{', '\tset {']
     query = list()
 
@@ -57,6 +69,7 @@ def generate_mutation():
         query.append(line)
 
         for pred, obj in edges.items():
+            # annotation = annotations.get(pred, "")
             if not isinstance(obj, list):
                 obj = [obj]
 
@@ -84,6 +97,7 @@ def generate_mutation():
                     query.append(line)
 
     query = "\n".join(query)
+    Node._clear_staged()
 
     return query
 
@@ -149,4 +163,5 @@ def run_mutation(mutation: str, client=None, *args, **kwargs):
         transaction.commit()
     finally:
         transaction.discard()
+    # else:
     return o
