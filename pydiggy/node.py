@@ -136,6 +136,7 @@ class Node(metaclass=NodeMeta):
     def __init__(self, uid=None, **kwargs):
         if uid is None:
             uid = next(self._generate_uid())
+            print(f'Making uid: {uid}')
 
         self.uid = uid
         self._dirty = set()
@@ -169,6 +170,11 @@ class Node(metaclass=NodeMeta):
         if attribute in self.__annotations__:
             raise MissingAttribute(attribute)
         super().__getattribute__(attribute)
+
+    def __eq__(self, other):
+        if not issubclass(other.__class__, Node):
+            return False
+        return self.uid == other.uid
 
     def __setattr__(self, name, value):
         self.__dict__[name] = value
@@ -209,8 +215,9 @@ class Node(metaclass=NodeMeta):
                     _assign(value, reverse_name, self, directive.many)
 
     @classmethod
-    def __reset(cls):
+    def _reset(cls):
         cls._i = count()
+        cls._instances = dict()
 
     @classmethod
     def _register_node(cls, node):
@@ -642,8 +649,8 @@ class Node(metaclass=NodeMeta):
         set_mutations = '\n'.join(setters)
         delete_mutations = '\n'.join(deleters)
         transaction = client.txn()
-        print('set', set_mutations)
-        print('delete', delete_mutations)
+        # print('set', set_mutations)
+        # print('delete', delete_mutations)
 
         try:
             if set_mutations or delete_mutations:
