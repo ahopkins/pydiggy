@@ -61,10 +61,7 @@ def is_facets(node):
 
 
 def is_computed(node):
-    if (
-        isinstance(node, tuple)
-        and node.__class__.__name__ == "Computed"
-    ):
+    if isinstance(node, tuple) and node.__class__.__name__ == "Computed":
         return True
     return False
 
@@ -136,7 +133,7 @@ class Node(metaclass=NodeMeta):
     def __init__(self, uid=None, **kwargs):
         if uid is None:
             uid = next(self._generate_uid())
-            print(f'Making uid: {uid}')
+            print(f"Making uid: {uid}")
 
         self.uid = uid
         self._dirty = set()
@@ -166,9 +163,12 @@ class Node(metaclass=NodeMeta):
     def __repr__(self):
         return f"<{self.__class__.__name__}:{self.uid}>"
 
+    def __hash__(self):
+        return self.uid
+
     def __getattr__(self, attribute):
         if attribute in self.__annotations__:
-            raise MissingAttribute(attribute)
+            raise MissingAttribute(self, attribute)
         super().__getattribute__(attribute)
 
     def __eq__(self, other):
@@ -177,35 +177,43 @@ class Node(metaclass=NodeMeta):
         return self.uid == other.uid
 
     def __setattr__(self, name, value):
+        orig = self.__dict__.get(name, None)
         self.__dict__[name] = value
-        if hasattr(self, '_init') and self._init and not name.startswith('_'):
+        if hasattr(self, "_init") and self._init and not name.startswith("_"):
             self._dirty.add(name)
-        if name in self._directives \
-                and any(isinstance(d, reverse) for d in self._directives[name]):
-            directive = list(filter(lambda d: isinstance(
-                d, reverse), self._directives[name]))[0]
-            reverse_name = directive.name if directive.name else f'_{name}'
+        if name in self._directives and any(
+            isinstance(d, reverse) for d in self._directives[name]
+        ):
+            directive = list(
+                filter(
+                    lambda d: isinstance(d, reverse), self._directives[name]
+                )
+            )[0]
+            reverse_name = directive.name if directive.name else f"_{name}"
 
-            def _assign(obj, key, value, do_many):
+            def _assign(obj, key, value, do_many, remove=False):
                 o = obj.obj if is_facets(obj) else obj
 
                 if is_facets(obj):
                     props = obj._asdict()
-                    props['obj'] = value
+                    props["obj"] = value
                     value = Facets(**props)
 
                 if do_many:
                     if not hasattr(o, key):
                         setattr(o, key, list())
-                    o.__dict__[key].append(value)
+                    if remove:
+                        o.__dict__[key].remove(value)
+                    else:
+                        o.__dict__[key].append(value)
                 else:
                     setattr(o, key, value)
 
             # TODO:
             # - Add tuple and set support
-            if isinstance(value, (list, )):
+            if isinstance(value, (list,)):
                 for item in value:
-                    if is_facets(item):
+                    if is_facets(item) and directive.with_facets is False:
                         item = item.obj
                     _assign(item, reverse_name, self, directive.many)
             else:
@@ -213,6 +221,10 @@ class Node(metaclass=NodeMeta):
                 # Also, run a check that value is of type directive
                 if value is not None:
                     _assign(value, reverse_name, self, directive.many)
+                elif orig:
+                    _assign(
+                        orig, reverse_name, self, directive.many, remove=True
+                    )
 
     @classmethod
     def _reset(cls):
@@ -267,8 +279,9 @@ class Node(metaclass=NodeMeta):
                     prop_type = prop_type.__args__[0]
 
                 prop_type = PropType(
-                    prop_type, is_list_type, node._directives.get(
-                        prop_name, [])
+                    prop_type,
+                    is_list_type,
+                    node._directives.get(prop_name, []),
                 )
 
                 if prop_name in edges:
@@ -306,8 +319,9 @@ class Node(metaclass=NodeMeta):
                     edges[prop_name] = prop_type
                 elif cls._is_node_type(prop_type[0]):
                     edges[prop_name] = PropType(
-                        "uid", is_list_type, node._directives.get(
-                            prop_name, [])
+                        "uid",
+                        is_list_type,
+                        node._directives.get(prop_name, []),
                     )
                 else:
                     if prop_name != "uid":
@@ -382,7 +396,11 @@ class Node(metaclass=NodeMeta):
             delay = []
             computed = {}
 
-            pred_items = [(pred, value) for pred, value in raw.items() if not pred.startswith("_")]
+            pred_items = [
+                (pred, value)
+                for pred, value in raw.items()
+                if not pred.startswith("_")
+            ]
 
             annotations = get_type_hints(k)
             for pred, value in pred_items:
@@ -405,31 +423,39 @@ class Node(metaclass=NodeMeta):
                                 # a single item in it. If the developer wants
                                 # multiple: then the Node definition should
                                 # be List[MyNode]
-                                raise Exception('Unknown data')
-                            node = get_node(value[0].get('_type'))
+                                raise Exception("Unknown data")
+                            node = get_node(value[0].get("_type"))
                             value = node._hydrate(value[0])
                     elif isinstance(value, dict):
                         value = cls._hydrate(value)
 
                     if value is not None:
                         kwargs.update({pred: value})
-                elif pred.startswith('~'):
+                elif pred.startswith("~"):
                     p = pred[1:]
                     if isinstance(value, list):
                         for x in value:
                             keys = deepcopy(list(x.keys()))
                             value_facet_data = [
-                                (k.split("|")[1], x.pop(k)) for k in keys if "|" in k
+                                (k.split("|")[1], x.pop(k))
+                                for k in keys
+                                if "|" in k
                             ]
-                            item = get_node(x.get('_type'))._hydrate(x)
+                            item = get_node(x.get("_type"))._hydrate(x)
 
                             if value_facet_data:
                                 item = Facets(item, **dict(value_facet_data))
                             delay.append((item, p, value_facet_data))
                     elif isinstance(value, dict):
-                        delay.append((get_node(value.get('_type'))._hydrate(value), p, None))
+                        delay.append(
+                            (
+                                get_node(value.get("_type"))._hydrate(value),
+                                p,
+                                None,
+                            )
+                        )
                 else:
-                    if pred.endswith('_uid'):
+                    if pred.endswith("_uid"):
                         value = int(value, 16)
                     computed.update({pred: value})
 
@@ -455,19 +481,20 @@ class Node(metaclass=NodeMeta):
     def json(cls):
         return {
             x.__name__: list(
-                map(partial(cls._explode, max_depth=0), x._instances.values()))
+                map(partial(cls._explode, max_depth=0), x._instances.values())
+            )
             for x in cls._nodes
             if len(x._instances) > 0
         }
 
     @classmethod
     def _explode(cls, instance, max_depth=None, depth=0, include=None):
-        obj = {'_type': instance.__class__.__name__}
+        obj = {"_type": instance.__class__.__name__}
 
         if not isinstance(instance, Node) and not is_facets(instance):
             if is_facets(instance):
                 return instance._asdict()
-            raise Exception('Cannot explode a non-Node object')
+            raise Exception("Cannot explode a non-Node object")
 
         if is_facets(instance):
             data = list(instance._asdict().items())
@@ -481,22 +508,29 @@ class Node(metaclass=NodeMeta):
 
         annotations = get_type_hints(instance.__class__)
         for key, value in data:
-            if is_facets(instance) \
-                    or key in annotations.keys() \
-                    or key == 'uid' \
-                    or (include and key in include):
+            if (
+                is_facets(instance)
+                or key in annotations.keys()
+                or key == "uid"
+                or (include and key in include)
+            ):
                 if isinstance(value, (str, int, float, bool)):
                     obj[key] = value
                 elif issubclass(value.__class__, Node):
-                    explode = depth < max_depth if max_depth is not None else True
+                    explode = (
+                        depth < max_depth if max_depth is not None else True
+                    )
                     if explode:
-                        obj[key] = cls._explode(value, depth=(depth + 1),
-                                                max_depth=max_depth)
+                        obj[key] = cls._explode(
+                            value, depth=(depth + 1), max_depth=max_depth
+                        )
                     else:
                         obj[key] = str(value)
-                elif isinstance(value, (list, )):
-                    obj[key] = [cls._explode(x, depth=(depth + 1),
-                                             max_depth=max_depth) for x in value]
+                elif isinstance(value, (list,)):
+                    obj[key] = [
+                        cls._explode(x, depth=(depth + 1), max_depth=max_depth)
+                        for x in value
+                    ]
                 elif is_computed(value):
                     obj.update({key: value._asdict()})
                 elif is_facets(value):
@@ -513,7 +547,7 @@ class Node(metaclass=NodeMeta):
                         obj[key].append(value._asdict())
                     else:
                         item = value._asdict()
-                        item.update({'is_facets': True})
+                        item.update({"is_facets": True})
                         obj[key] = value._asdict()
         return obj
 
@@ -556,7 +590,10 @@ class Node(metaclass=NodeMeta):
 
         def _make_obj(node, pred, obj):
             annotation = annotations.get(pred, "")
-            if hasattr(annotation, "__origin__") and annotation.__origin__ == list:
+            if (
+                hasattr(annotation, "__origin__")
+                and annotation.__origin__ == list
+            ):
                 annotation = annotation.__args__[0]
 
             try:
@@ -572,10 +609,18 @@ class Node(metaclass=NodeMeta):
                     obj, passed = _parse_subject(obj.uid)
                     staged = Node._get_staged()
 
-                    if obj not in staged and passed not in staged and not isinstance(passed, int):
-                        raise NotStaged(f'<{node.__class__.__name__} {pred}={obj}>')
+                    if (
+                        obj not in staged
+                        and passed not in staged
+                        and not isinstance(passed, int)
+                    ):
+                        raise NotStaged(
+                            f"<{node.__class__.__name__} {pred}={obj}>"
+                        )
             except ValueError:
-                raise ValueError(f'Incorrect value type. Received <{node.__class__.__name__} {pred}={obj}>. Expecting <{node.__class__.__name__} {pred}={annotation.__name__}>')
+                raise ValueError(
+                    f"Incorrect value type. Received <{node.__class__.__name__} {pred}={obj}>. Expecting <{node.__class__.__name__} {pred}={annotation.__name__}>"
+                )
 
             if isinstance(obj, (tuple, set)):
                 obj = list(obj)
@@ -586,8 +631,7 @@ class Node(metaclass=NodeMeta):
         deleters = []
 
         saveable = (
-            x for x in self._dirty
-            if x != 'computed' and x in annotations
+            x for x in self._dirty if x != "computed" and x in annotations
         )
 
         for pred in saveable:
@@ -604,7 +648,7 @@ class Node(metaclass=NodeMeta):
                 if is_facets(o):
                     for facet in o.__class__._fields[1:]:
                         val = _raw_value(getattr(o, facet))
-                        facets.append(f'{facet}={val}')
+                        facets.append(f"{facet}={val}")
                     o = o.obj
 
                 if not isinstance(o, (list, tuple, set)):
@@ -646,15 +690,17 @@ class Node(metaclass=NodeMeta):
                         line = f"{subject} <{pred}> {output} ."
                     setters.append(line)
 
-        set_mutations = '\n'.join(setters)
-        delete_mutations = '\n'.join(deleters)
+        set_mutations = "\n".join(setters)
+        delete_mutations = "\n".join(deleters)
         transaction = client.txn()
         # print('set', set_mutations)
         # print('delete', delete_mutations)
 
         try:
             if set_mutations or delete_mutations:
-                o = transaction.mutate(set_nquads=set_mutations, del_nquads=delete_mutations)
+                o = transaction.mutate(
+                    set_nquads=set_mutations, del_nquads=delete_mutations
+                )
                 transaction.commit()
         finally:
             transaction.discard()
