@@ -14,7 +14,7 @@ class ConflictingType(AttributeError):  # noqa
 class NotStaged(AttributeError):  # noqa
     def __init__(self, uid):
         msg = (
-            f"Cannot generate with unstaged reference {uid}. "
+            f"Cannot generate with unstaged reference: {uid}. "
             "Did you forget to call <node>.stage()"
         )
 

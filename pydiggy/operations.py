@@ -25,11 +25,17 @@ def _make_obj(node, pred, obj):
 
     try:
         if Node._is_node_type(obj.__class__):
-            obj, passed = _parse_subject(obj.uid)
+            uid, passed = _parse_subject(obj.uid)
             staged = Node._get_staged()
 
-            if obj not in staged and passed not in staged and not isinstance(passed, int):
-                raise NotStaged(f'<{node.__class__.__name__} {pred}={obj}>')
+            if (
+                uid not in staged
+                and passed not in staged
+                and not isinstance(passed, int)
+            ):
+                raise NotStaged(
+                    f"<{node.__class__.__name__} {pred}={uid}|{obj.__class__.__name__}>"
+                )
         elif annotation == bool:
             obj = f'"{str(obj).lower()}"'
         elif annotation in (int,):
@@ -41,7 +47,9 @@ def _make_obj(node, pred, obj):
         else:
             obj = f'"{obj}"'
     except ValueError:
-        raise ValueError(f'Incorrect value type. Received <{node.__class__.__name__} {pred}={obj}>. Expecting <{node.__class__.__name__} {pred}={annotation.__name__}>')
+        raise ValueError(
+            f"Incorrect value type. Received <{node.__class__.__name__} {pred}={obj}>. Expecting <{node.__class__.__name__} {pred}={annotation.__name__}>"
+        )
 
     if isinstance(obj, (tuple, set)):
         obj = list(obj)
@@ -78,7 +86,7 @@ def generate_mutation():
                 if isinstance(o, tuple) and hasattr(o, "obj"):
                     for facet in o.__class__._fields[1:]:
                         val = _raw_value(getattr(o, facet))
-                        facets.append(f'{facet}={val}')
+                        facets.append(f"{facet}={val}")
                     o = o.obj
 
                 if not isinstance(o, (list, tuple, set)):
@@ -125,19 +133,19 @@ def hydrate(data):
 def query(qry: str, client=None, raw=False, json=False, *args, **kwargs):
     if client is None:
         client = get_client(**kwargs)
-        if 'host' in kwargs:
-            kwargs.pop('host')
-        if 'port' in kwargs:
-            kwargs.pop('port')
+        if "host" in kwargs:
+            kwargs.pop("host")
+        if "port" in kwargs:
+            kwargs.pop("port")
     raw_data = client.query(qry, *args, **kwargs)
     json_data = _json.loads(raw_data.json)
     output = hydrate(json_data)
 
     if raw:
-        output['raw'] = raw_data
+        output["raw"] = raw_data
 
     if json:
-        output['json'] = json_data
+        output["json"] = json_data
 
     return output
 

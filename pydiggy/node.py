@@ -133,7 +133,6 @@ class Node(metaclass=NodeMeta):
     def __init__(self, uid=None, **kwargs):
         if uid is None:
             uid = next(self._generate_uid())
-            print(f"Making uid: {uid}")
 
         self.uid = uid
         self._dirty = set()
