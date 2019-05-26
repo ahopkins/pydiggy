@@ -1,15 +1,13 @@
-from pydiggy.node import Node
-from pydiggy.exceptions import NotStaged, InvalidData
-from typing import get_type_hints, List, Union, Tuple
-from pydiggy.types import *  # noqa
-from pydiggy.connection import get_client
-from pydiggy.utils import _parse_subject
-from pydiggy.utils import _rdf_value
-from pydiggy.utils import _raw_value
-from typing import _GenericAlias
 import json as _json
 from datetime import datetime
 from enum import Enum
+from typing import List, Tuple, Union, _GenericAlias, get_type_hints
+
+from pydiggy.connection import get_client
+from pydiggy.exceptions import InvalidData, NotStaged
+from pydiggy.node import Node
+from pydiggy.types import *  # noqa
+from pydiggy.utils import _parse_subject, _raw_value, _rdf_value
 
 
 def _make_obj(node, pred, obj):
@@ -25,6 +23,7 @@ def _make_obj(node, pred, obj):
 
     try:
         if Node._is_node_type(obj.__class__):
+            print(True)
             uid, passed = _parse_subject(obj.uid)
             staged = Node._get_staged()
 
@@ -36,6 +35,12 @@ def _make_obj(node, pred, obj):
                 raise NotStaged(
                     f"<{node.__class__.__name__} {pred}={uid}|{obj.__class__.__name__}>"
                 )
+            else:
+                try:
+                    uid = hex(int(obj.uid))
+                    obj = f"<{uid}>"
+                except ValueError:
+                    obj = f"_:{obj.uid}"
         elif annotation == bool:
             obj = f'"{str(obj).lower()}"'
         elif annotation in (int,):
@@ -110,9 +115,10 @@ def generate_mutation():
     return query
 
 
-def hydrate(data):
+def hydrate(data, types=None):
     # if not isinstance(data, dict) or data_set not in data:
     #     raise InvalidData
+    types = {x.__name__: x for x in types} if types else None
 
     output = {}
     # data = data.get(data_set)
@@ -123,7 +129,7 @@ def hydrate(data):
         for raw in raw_data:
             if "_type" in raw and raw.get("_type") in registered:
                 cls = registered.get(raw.get("_type"))
-                hydrated.append(cls._hydrate(raw))
+                hydrated.append(cls._hydrate(raw, types=types))
 
         output[func_name] = hydrated
 

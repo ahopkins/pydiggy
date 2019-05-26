@@ -4,10 +4,9 @@
 """Tests for `pydiggy` package."""
 
 import pytest
-
 from click.testing import CliRunner
 
-from pydiggy import cli, Node
+from pydiggy import Node, cli
 
 
 @pytest.fixture

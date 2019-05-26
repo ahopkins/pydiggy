@@ -1,16 +1,11 @@
 [[source]]
-
 url = "https://pypi.org/simple"
 verify_ssl = true
 name = "pypi"
 
-
 [dev-packages]
 
-
-
 [packages]
-
 pydiggy = {path = ".", editable = true}
 black = "*"
 pydgraph = "*"
@@ -22,8 +17,7 @@ pytest-flakes = "*"
 "pytest-pep8" = "*"
 "371f01a" = {path = "./", editable = true}
 mypy = "*"
-
+isort = "*"
 
 [requires]
-
 python_version = "3.7"

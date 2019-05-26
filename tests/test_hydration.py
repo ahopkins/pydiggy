@@ -1,9 +1,10 @@
 from __future__ import annotations
 
-
-from pydiggy import Node, generate_mutation, Facets, hydrate, is_facets, reverse
 from typing import List
+
 import pytest
+
+from pydiggy import Facets, Node, generate_mutation, hydrate, is_facets, reverse
 
 
 @pytest.fixture
@@ -14,9 +15,7 @@ def retrieved_data_simple():
                 "uid": "0x11",
                 "_type": "Region",
                 "name": "Portugal",
-                "borders": [
-                    {"uid": "0x12", "_type": "Region", "name": "Spain"}
-                ],
+                "borders": [{"uid": "0x12", "_type": "Region", "name": "Spain"}],
             },
             {
                 "uid": "0x12",
@@ -25,11 +24,7 @@ def retrieved_data_simple():
                 "borders": [
                     {"uid": "0x11", "_type": "Region", "name": "Portugal"},
                     {"uid": "0x13", "_type": "Region", "name": "Gascony"},
-                    {
-                        "uid": "0x14",
-                        "_type": "Region",
-                        "name": "Marseilles",
-                    },
+                    {"uid": "0x14", "_type": "Region", "name": "Marseilles"},
                 ],
             },
             {
@@ -44,11 +39,7 @@ def retrieved_data_simple():
                         "borders|foo": "bar",
                         "borders|hello": "world",
                     },
-                    {
-                        "uid": "0x14",
-                        "_type": "Region",
-                        "name": "Marseilles",
-                    },
+                    {"uid": "0x14", "_type": "Region", "name": "Marseilles"},
                 ],
             },
             {
@@ -68,34 +59,18 @@ def retrieved_data_simple():
 def retrieved_data_with_reverse():
     return {
         "map": [
-          {
-            "_type": "Map",
-            "uid": "0x691",
-            "~map": [
-                {
-                    "uid": "0x11",
-                    "_type": "Region",
-                    "name": "Portugal",
-                },
-                {
-                    "uid": "0x12",
-                    "_type": "Region",
-                    "name": "Spain",
-                },
-                {
-                    "uid": "0x13",
-                    "_type": "Region",
-                    "name": "Gascony",
-                },
-                {
-                    "uid": "0x14",
-                    "_type": "Region",
-                    "name": "Marseilles",
-                }
-            ]
-          }
+            {
+                "_type": "Map",
+                "uid": "0x691",
+                "~map": [
+                    {"uid": "0x11", "_type": "Region", "name": "Portugal"},
+                    {"uid": "0x12", "_type": "Region", "name": "Spain"},
+                    {"uid": "0x13", "_type": "Region", "name": "Gascony"},
+                    {"uid": "0x14", "_type": "Region", "name": "Marseilles"},
+                ],
+            }
         ]
-      }
+    }
 
 
 def test_hydration(retrieved_data_simple):
@@ -105,7 +80,7 @@ def test_hydration(retrieved_data_simple):
         name: str
         borders: List[Region]
 
-    data = hydrate(retrieved_data_simple)
+    data = hydrate(retrieved_data_simple, types=[Region])
 
     assert "allRegions" in data
     assert len(data.get("allRegions")) == 4
@@ -139,12 +114,12 @@ def test_hydration_reverse(retrieved_data_with_reverse):
         pass
 
     class Region(Node):
-        map: Map = reverse(name='territories', many=True)
+        map: Map = reverse(name="territories", many=True)
         name: str
         borders: List[Region]
 
     data = hydrate(retrieved_data_with_reverse)
-    m = data['map'][0]
+    m = data["map"][0]
 
     assert m.territories
     assert len(m.territories) == 4

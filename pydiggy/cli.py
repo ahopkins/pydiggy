@@ -1,12 +1,13 @@
 # -*- coding: utf-8 -*-
 
 """Console script for pydiggy."""
-import click
 import importlib
 
-from pydiggy.node import Node
-from pydiggy.connection import get_client
+import click
 from pydgraph import Operation
+
+from pydiggy.connection import get_client
+from pydiggy.node import Node
 
 
 @click.group()
@@ -16,12 +17,8 @@ def main():
 
 
 @main.command()
-@click.confirmation_option(
-    prompt="Are you sure you want to flush all data in the db?"
-)
-@click.option(
-    "-h", "--host", default="localhost", type=str, help="Dgraph host address"
-)
+@click.confirmation_option(prompt="Are you sure you want to flush all data in the db?")
+@click.option("-h", "--host", default="localhost", type=str, help="Dgraph host address")
 @click.option("-p", "--port", default=9080, type=int, help="Dgraph port")
 def flush(host, port):
     click.echo(f"Connecting to {host}:{port}")
@@ -34,13 +31,9 @@ def flush(host, port):
 @main.command()
 @click.argument("module")
 @click.option(
-    "--run/--no-run",
-    default=False,
-    help="Whether to run the schema changes or not",
+    "--run/--no-run", default=False, help="Whether to run the schema changes or not"
 )
-@click.option(
-    "-h", "--host", default="localhost", type=str, help="Dgraph host address"
-)
+@click.option("-h", "--host", default="localhost", type=str, help="Dgraph host address")
 @click.option("-p", "--port", default=9080, type=int, help="Dgraph port")
 def generate(module, run, host, port):
     """Generate a Dgraph schema"""

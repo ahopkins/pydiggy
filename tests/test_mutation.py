@@ -1,4 +1,4 @@
-from pydiggy import generate_mutation, Facets
+from pydiggy import Facets, generate_mutation
 
 # import pytest
 
@@ -6,7 +6,7 @@ from pydiggy import generate_mutation, Facets
 def test_mutations(RegionClass):
     Region = RegionClass
 
-    Region._Node__reset()
+    Region._reset()
 
     por = Region(uid=0x11, name="Portugal")
     spa = Region(uid=0x12, name="Spain")
@@ -46,8 +46,11 @@ _:unsaved.1 <name> "Marseilles" .
 _:unsaved.1 <borders> <0x12> .
 _:unsaved.1 <borders> _:unsaved.0 ."""  # noqa
 
-    control = [x.strip() for x in control.split('\n')]
-    mutation = [x.strip() for x in mutation.split('\n')]
+    control = [x.strip() for x in control.split("\n")]
+    mutation = [x.strip() for x in mutation.split("\n")]
 
     assert len(control) == len(mutation)
+    import pprint
+
+    pprint.pprint(mutation)
     assert control == mutation

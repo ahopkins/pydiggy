@@ -1,5 +1,6 @@
-from pydiggy.exceptions import MissingAttribute
 import pytest
+
+from pydiggy.exceptions import MissingAttribute
 
 
 def test_missing(RegionClass):

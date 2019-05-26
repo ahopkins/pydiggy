@@ -1,9 +1,8 @@
+from dataclasses import dataclass
 from datetime import datetime
 from decimal import Decimal
-from typing import Union
-from typing import Optional
-from dataclasses import dataclass
 from inspect import isclass
+from typing import Optional, Union
 
 
 class uid:
@@ -58,9 +57,7 @@ _bool = type("_bool", (Tokenizer,), {})
 
 
 class index(Directive):
-    tokenizer: Union[
-        _hash, exact, term, fulltext, trigram, _int, _float, _bool
-    ]
+    tokenizer: Union[_hash, exact, term, fulltext, trigram, _int, _float, _bool]
 
     def __init__(self, tokenizer=None):
         self.tokenizer = tokenizer

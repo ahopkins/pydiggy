@@ -1,8 +1,8 @@
 from __future__ import annotations
 
-
-from pydiggy import Node, generate_mutation, Facets
 from typing import List
+
+from pydiggy import Facets, Node, generate_mutation
 
 
 class Region(Node):

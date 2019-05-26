@@ -1,8 +1,8 @@
 from __future__ import annotations
 
 from typing import List
-from pydiggy import Node
-from pydiggy import reverse
+
+from pydiggy import Node, reverse
 
 
 def test_reverse_normal():
@@ -46,7 +46,7 @@ def test_reverse_list_single():
 
 def test_reverse_name():
     class Person(Node):
-        parent: Person = reverse(name='child')
+        parent: Person = reverse(name="child")
 
     p = Person()
     c = Person()
@@ -58,7 +58,7 @@ def test_reverse_name():
 
 def test_reverse_name_many():
     class Person(Node):
-        parent: Person = reverse(name='children', many=True)
+        parent: Person = reverse(name="children", many=True)
 
     p = Person()
     c1 = Person()

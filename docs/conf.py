@@ -21,9 +21,10 @@
 import os
 import sys
 
+import pydiggy
+
 sys.path.insert(0, os.path.abspath(".."))
 
-import pydiggy
 
 # -- General configuration ---------------------------------------------
 
@@ -126,13 +127,7 @@ latex_elements = {
 # (source start file, target name, title, author, documentclass
 # [howto, manual, or own class]).
 latex_documents = [
-    (
-        master_doc,
-        "pydiggy.tex",
-        u"PyDiggy Documentation",
-        u"Adam Hopkins",
-        "manual",
-    )
+    (master_doc, "pydiggy.tex", u"PyDiggy Documentation", u"Adam Hopkins", "manual")
 ]
 
 

@@ -13,8 +13,9 @@ def test__parse_subject():
 
 
 def test__make_obj(TypeTestClass):
-    TypeTestClass._Node__reset()
+    TypeTestClass._reset()
     node = TypeTestClass()
+    node.stage()
 
     o = operations._make_obj(node, "str_type", "FooBar")
     assert o == '"FooBar"'

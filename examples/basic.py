@@ -1,15 +1,19 @@
 from __future__ import annotations
 
-
-from pydiggy import Node, generate_mutation, Facets
-from pydiggy import geo
-from pydiggy import index
-from pydiggy import lang
-from pydiggy import count
-from pydiggy import reverse
-from pydiggy import upsert
-from pydiggy import types
 from typing import List, Union
+
+from pydiggy import (
+    Facets,
+    Node,
+    count,
+    generate_mutation,
+    geo,
+    index,
+    lang,
+    reverse,
+    types,
+    upsert,
+)
 
 
 class Region(Node):

@@ -1,8 +1,10 @@
 from __future__ import annotations
 
-import pytest
-from pydiggy import Node
 from typing import List
+
+import pytest
+
+from pydiggy import Node
 
 
 @pytest.fixture
