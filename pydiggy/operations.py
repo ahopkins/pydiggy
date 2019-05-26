@@ -1,13 +1,13 @@
 import json as _json
 from datetime import datetime
 from enum import Enum
-from typing import List, Tuple, Union, _GenericAlias, get_type_hints
+from typing import List, Tuple, Union, get_type_hints, Dict, Any
 
-from pydiggy.connection import get_client
-from pydiggy.exceptions import InvalidData, NotStaged
+from pydiggy.connection import get_client, PyDiggyClient
+from pydiggy.exceptions import NotStaged
 from pydiggy.node import Node
-from pydiggy.types import *  # noqa
-from pydiggy.utils import _parse_subject, _raw_value, _rdf_value
+from pydiggy._types import *  # noqa
+from pydiggy.utils import _parse_subject, _raw_value
 
 
 def _make_obj(node, pred, obj):
@@ -21,9 +21,10 @@ def _make_obj(node, pred, obj):
     if issubclass(obj.__class__, Enum):
         obj = obj.value
 
+    # TODO:
+    # - integreate utils._rdf_value
     try:
         if Node._is_node_type(obj.__class__):
-            print(True)
             uid, passed = _parse_subject(obj.uid)
             staged = Node._get_staged()
 
@@ -62,10 +63,13 @@ def _make_obj(node, pred, obj):
     return obj
 
 
-def generate_mutation():
+def generate_mutation() -> str:
+    """
+    Retrieve staged instances and generate the mutation query
+    """
     staged = Node._get_staged()
-    localns = {x.__name__: x for x in Node._nodes}
-    localns.update({"List": List, "Union": Union, "Tuple": Tuple})
+    # localns = {x.__name__: x for x in Node._nodes}
+    # localns.update({"List": List, "Union": Union, "Tuple": Tuple})
     # annotations = get_type_hints(Node, globalns=globals(), localns=localns)
 
     # query = ['{', '\tset {']
@@ -115,7 +119,10 @@ def generate_mutation():
     return query
 
 
-def hydrate(data, types=None):
+def hydrate(data: str, types: List[Node] = None) -> Dict[str, List[Node]]:
+    """
+    Given data retrieved from dgraph, return Python Node instances
+    """
     # if not isinstance(data, dict) or data_set not in data:
     #     raise InvalidData
     types = {x.__name__: x for x in types} if types else None
@@ -136,7 +143,20 @@ def hydrate(data, types=None):
     return output
 
 
-def query(qry: str, client=None, raw=False, json=False, *args, **kwargs):
+def query(
+    qry: str,
+    client: PyDiggyClient = None,
+    raw: bool = False,
+    json: bool = False,
+    *args,
+    **kwargs,
+) -> Dict[str, Any]:
+    """
+    Perform a pydgraph query and return hydrated Python Node objects.
+
+    :param raw: Should the raw return of the query be returned
+    :param json: Should the raw python objects of the query be returned
+    """
     if client is None:
         client = get_client(**kwargs)
         if "host" in kwargs:
@@ -157,6 +177,11 @@ def query(qry: str, client=None, raw=False, json=False, *args, **kwargs):
 
 
 def run_mutation(mutation: str, client=None, *args, **kwargs):
+    # TODO:
+    # - Should come up with some sort of way to split mutations and run them
+    #   consexutively instead of all at once. The following is the general idea,
+    #   but it will fail because not all references will be properly defined
+    #   from one mutation to the next
     # MAX = 1_000
     # mutations = mutation.split("\n")
     # mutations = [mutations[i:i + MAX] for i in range(0, len(mutations), MAX)]

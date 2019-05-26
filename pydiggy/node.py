@@ -10,14 +10,22 @@ from datetime import datetime
 from decimal import Decimal
 from enum import Enum
 from functools import lru_cache, partial
-from itertools import count
-from typing import Dict, List, Optional, Tuple, Union, _GenericAlias, get_type_hints
+from itertools import count as _count
+from typing import (
+    Any,
+    Dict,
+    List,
+    Optional,
+    Tuple,
+    Union,
+    _GenericAlias,
+    get_type_hints,
+)
 
-from pydiggy.connection import get_client
+from pydiggy.connection import get_client, PyDiggyClient
 from pydiggy.exceptions import ConflictingType, InvalidData, MissingAttribute
 from pydiggy.utils import _parse_subject, _raw_value, _rdf_value
-
-from .types import (
+from pydiggy._types import (
     ACCEPTABLE_GENERIC_ALIASES,
     ACCEPTABLE_TRANSLATIONS,
     DGRAPH_TYPES,
@@ -26,6 +34,10 @@ from .types import (
     geo,
     reverse,
     uid,
+    reverse,
+    count,
+    upsert,
+    lang,
 )
 
 PropType = namedtuple("PropType", ("prop_type", "is_list_type", "directives"))
@@ -41,7 +53,7 @@ def Computed(**kwargs):
     return f(*kwargs.values())
 
 
-def is_facets(node):
+def is_facets(node: Node) -> bool:
     if (
         isinstance(node, tuple)
         and hasattr(node, "obj")
@@ -51,13 +63,20 @@ def is_facets(node):
     return False
 
 
-def is_computed(node):
+def is_computed(node: Node) -> bool:
     if isinstance(node, tuple) and node.__class__.__name__ == "Computed":
         return True
     return False
 
 
-def _force_instance(directive, prop_type=None):
+def _force_instance(
+    directive: Union[Directive, reverse, count, upsert, lang],
+    prop_type: str = None,
+) -> Directive:
+    # TODO:
+    # - Make sure directive is an instance of, or a class defined as a directive
+    #   Or, raise an exception
+
     if isinstance(directive, Directive):
         return directive
 
@@ -70,14 +89,24 @@ def _force_instance(directive, prop_type=None):
     return directive(*args)
 
 
-def get_node(name):
+def get_node(name: str) -> Node:
+    """
+    Retrieve a registered node class.
+
+    Example: Region = get_node("Region")
+
+    This is a safe method to make sure that any models used have been
+    declared as a Node.
+    """
     registered = {x.__name__: x for x in Node._nodes}
     return registered.get(name, None)
 
 
 class NodeMeta(type):
     def __new__(cls, name, bases, attrs, **kwargs):
-        directives = [x for x in attrs if x in attrs.get("__annotations__", {}).keys()]
+        directives = [
+            x for x in attrs if x in attrs.get("__annotations__", {}).keys()
+        ]
         attrs["_directives"] = dict()
         attrs["_instances"] = dict()
 
@@ -106,12 +135,10 @@ class NodeMeta(type):
         return super().__new__(cls, name, bases, attrs, **kwargs)
 
 
-# @dataclass
 class Node(metaclass=NodeMeta):
-    # uid: Union[uuid.UUID, int]
     uid: int
 
-    _i = count()
+    _i = _count()
     _nodes = []
     _staged = {}
 
@@ -121,11 +148,20 @@ class Node(metaclass=NodeMeta):
 
     def __init__(self, uid=None, **kwargs):
         if uid is None:
+            # TODO:
+            # - There probably should be another property that is set here
+            #   so that it is possible to identify with a boolean if the instance
+            #   is brand new (and has never been committed to the DB) or if it
+            #   is being freshly generated
             uid = next(self._generate_uid())
 
         self.uid = uid
         self._dirty = set()
 
+        # TODO:
+        # - perhaps this code to generate self._annotations belongs somewhere
+        #   else. Regardless, there is a lot of cleanup in this module that
+        #   could probably use this property instead of running get_type_hints
         localns = {x.__name__: x for x in Node._nodes}
         localns.update({"List": List, "Union": Union, "Tuple": Tuple})
         self._annotations = get_type_hints(
@@ -138,10 +174,11 @@ class Node(metaclass=NodeMeta):
 
         self.__class__._instances.update({self.uid: self})
         self._init = True
+
         # The following code looks to see if there are any typing.List
         # annotations. If yes, it auto creates an empty list.localns
         # This is probably not a feature worth including. Developer
-        # should take responsibility for creating at run time.
+        # should take responsibility for creating at run time. But, then again...
         # localns = {x.__name__: x for x in Node._nodes}
         # localns.update({
         #     'List': List
@@ -168,7 +205,10 @@ class Node(metaclass=NodeMeta):
             return False
         return self.uid == other.uid
 
-    def __setattr__(self, name, value):
+    def __setattr__(self, name: str, value: Any):
+        # TODO:
+        # - Make sure name is not a protected keyword being manually set (like _type)
+
         orig = self.__dict__.get(name, None)
         self.__dict__[name] = value
         if hasattr(self, "_init") and self._init and not name.startswith("_"):
@@ -177,7 +217,9 @@ class Node(metaclass=NodeMeta):
             isinstance(d, reverse) for d in self._directives[name]
         ):
             directive = list(
-                filter(lambda d: isinstance(d, reverse), self._directives[name])
+                filter(
+                    lambda d: isinstance(d, reverse), self._directives[name]
+                )
             )[0]
             reverse_name = directive.name if directive.name else f"_{name}"
 
@@ -212,23 +254,25 @@ class Node(metaclass=NodeMeta):
                 if value is not None:
                     _assign(value, reverse_name, self, directive.many)
                 elif orig:
-                    _assign(orig, reverse_name, self, directive.many, remove=True)
+                    _assign(
+                        orig, reverse_name, self, directive.many, remove=True
+                    )
 
     @classmethod
-    def _reset(cls):
+    def _reset(cls) -> None:
         cls._i = count()
         cls._instances = dict()
 
     @classmethod
-    def _register_node(cls, node):
+    def _register_node(cls, node: Node) -> None:
         cls._nodes.append(node)
 
     @classmethod
-    def _get_name(cls):
+    def _get_name(cls) -> str:
         return cls.__name__
 
     @classmethod
-    def _generate_schema(cls):
+    def _generate_schema(cls) -> str:
         nodes = cls._nodes
         edges = {}
         schema = []
@@ -238,6 +282,8 @@ class Node(metaclass=NodeMeta):
 
         type_schema.append(f"_type: string .")
 
+        # TODO:
+        # - Prime candidate for some refactoring to reduce complexity
         for node in nodes:
             name = node._get_name()
             type_schema.append(f"{name}: bool @index(bool) .")
@@ -253,6 +299,7 @@ class Node(metaclass=NodeMeta):
                 #   predicate. If it is possible, then the solution may simply
                 #   be to loop over a list of deepcopy(annotations.items()),
                 #   and append all the __args__ to that list to extend the iteration
+                # - is_list_type should probably become its own function
                 is_list_type = (
                     True
                     if isinstance(prop_type, _GenericAlias)
@@ -267,23 +314,33 @@ class Node(metaclass=NodeMeta):
                     prop_type = prop_type.__args__[0]
 
                 prop_type = PropType(
-                    prop_type, is_list_type, node._directives.get(prop_name, [])
+                    prop_type,
+                    is_list_type,
+                    node._directives.get(prop_name, []),
                 )
 
                 if prop_name in edges:
-                    if prop_type != edges.get(prop_name) and not cls._is_node_type(
-                        prop_type[0]
-                    ):
+                    if prop_type != edges.get(
+                        prop_name
+                    ) and not cls._is_node_type(prop_type[0]):
 
+                        # Check if there is a type conflict
                         if (
-                            edges.get(prop_name).directives != prop_type.directives
+                            edges.get(prop_name).directives
+                            != prop_type.directives
                             and all(
-                                (inspect.isclass(x) and issubclass(x, Directive))
+                                (
+                                    inspect.isclass(x)
+                                    and issubclass(x, Directive)
+                                )
                                 or issubclass(x.__class__, Directive)
                                 for x in edges.get(prop_name).directives
                             )
                             and all(
-                                (inspect.isclass(x) and issubclass(x, Directive))
+                                (
+                                    inspect.isclass(x)
+                                    and issubclass(x, Directive)
+                                )
                                 or issubclass(x.__class__, Directive)
                                 for x in prop_type.directives
                             )
@@ -294,11 +351,14 @@ class Node(metaclass=NodeMeta):
                                 prop_name, prop_type, edges.get(prop_name)
                             )
 
+                # Set the type for translating the value
                 if prop_type[0] in ACCEPTABLE_TRANSLATIONS:
                     edges[prop_name] = prop_type
                 elif cls._is_node_type(prop_type[0]):
                     edges[prop_name] = PropType(
-                        "uid", is_list_type, node._directives.get(prop_name, [])
+                        "uid",
+                        is_list_type,
+                        node._directives.get(prop_name, []),
                     )
                 else:
                     if prop_name != "uid":
@@ -308,13 +368,14 @@ class Node(metaclass=NodeMeta):
                             f"{prop_name}: {prop_type[0]} || {origin}"
                         )
 
-        # <<<<<<< HEAD
+        # TODO:
+        # - When the v1.1 comes out, will need to address this:
+        #
         #         for edge_name, (edge_type, is_list_type) in edges.items():
         #             type_name = cls._get_type_name(edge_type)
         #             # Currently, Dgraph does not support [uid] schema.
         #             # See https://github.com/dgraph-io/dgraph/issues/2511
         #             if is_list_type and type_name != 'uid':
-        # =======
         for edge_name, edge in edges.items():
             type_name = cls._get_type_name(edge.prop_type)
             if edge.is_list_type and type_name != "uid":
@@ -352,14 +413,22 @@ class Node(metaclass=NodeMeta):
     @classmethod
     def _clear_staged(cls):
         cls._staged = {}
-        cls._i = count()
+        cls._i = _count()
 
     @classmethod
-    def _hydrate(cls, raw, types=None):
+    def _hydrate(
+        cls, raw: Dict[str, Any], types: Dict[str, Node] = None
+    ) -> Node:
+        # TODO:
+        # - Accept types that are passed. Loop thru them and register if needed
+        #   and raising an exception if they are not valid.
+        # - This method is another candidate for some refactoring to reduce
+        #   complexity.
+        # - Should create a Facets type so that the type annotation of this function
+        #   is _hydrate(cls, raw: str, types: Dict[str, Node] = None) -> Union[Node, Facets]
         registered = {x.__name__: x for x in Node._nodes}
         localns = {x.__name__: x for x in Node._nodes}
         localns.update({"List": List, "Union": Union, "Tuple": Tuple})
-        # raise Exception(localns)
 
         if "_type" in raw and raw.get("_type") in registered:
             if "uid" not in raw:
@@ -377,11 +446,21 @@ class Node(metaclass=NodeMeta):
             computed = {}
 
             pred_items = [
-                (pred, value) for pred, value in raw.items() if not pred.startswith("_")
+                (pred, value)
+                for pred, value in raw.items()
+                if not pred.startswith("_")
             ]
 
-            annotations = get_type_hints(k, globalns=globals(), localns=localns)
+            annotations = get_type_hints(
+                k, globalns=globals(), localns=localns
+            )
             for pred, value in pred_items:
+                """
+                The pred falls into one of three categories:
+                1. predicates that have already been defined
+                2. predicates that are a reverse of a relationship
+                3. predicates that are used for some computed value
+                """
                 if pred in annotations:
                     if isinstance(value, list):
                         prop_type = annotations[pred]
@@ -401,6 +480,8 @@ class Node(metaclass=NodeMeta):
                                 # a single item in it. If the developer wants
                                 # multiple: then the Node definition should
                                 # be List[MyNode]
+                                # Will probably need to be revisited when
+                                # Dgraph v. 1.1 is released
                                 raise Exception("Unknown data")
                             node = get_node(value[0].get("_type"))
                             value = node._hydrate(value[0])
@@ -415,7 +496,9 @@ class Node(metaclass=NodeMeta):
                         for x in value:
                             keys = deepcopy(list(x.keys()))
                             value_facet_data = [
-                                (k.split("|")[1], x.pop(k)) for k in keys if "|" in k
+                                (k.split("|")[1], x.pop(k))
+                                for k in keys
+                                if "|" in k
                             ]
                             item = get_node(x.get("_type"))._hydrate(x)
 
@@ -424,7 +507,11 @@ class Node(metaclass=NodeMeta):
                             delay.append((item, p, value_facet_data))
                     elif isinstance(value, dict):
                         delay.append(
-                            (get_node(value.get("_type"))._hydrate(value), p, None)
+                            (
+                                get_node(value.get("_type"))._hydrate(value),
+                                p,
+                                None,
+                            )
                         )
                 else:
                     if pred.endswith("_uid"):
@@ -450,7 +537,15 @@ class Node(metaclass=NodeMeta):
         return None
 
     @classmethod
-    def json(cls):
+    def json(cls) -> Dict[str, List[Node]]:
+        """
+        Return mapping of Node names to a list of node instances.
+
+        Can be used as a way to dump what node instances are in memory.
+        """
+        # TODO:
+        # - Probably should be renamed
+        # - Instrad of being a List[Node], it should probably be a Set
         return {
             x.__name__: list(
                 map(partial(cls._explode, max_depth=0), x._instances.values())
@@ -460,10 +555,20 @@ class Node(metaclass=NodeMeta):
         }
 
     @classmethod
-    def _explode(cls, instance, max_depth=None, depth=0, include=None):
+    def _explode(
+        cls,
+        instance: Node,
+        max_depth: Optional[int] = None,
+        depth: int = 0,
+        include: List[str] = None,
+    ) -> Dict[str, Any]:
+        """
+        Explode a Node object into a mapping 
+        """
+        # TODO:
+        # - Candidate for refactoring
+        # - Should the default max_depth be None?
         obj = {"_type": instance.__class__.__name__}
-        localns = {x.__name__: x for x in Node._nodes}
-        localns.update({"List": List, "Union": Union, "Tuple": Tuple})
 
         if not isinstance(instance, Node) and not is_facets(instance):
             if is_facets(instance):
@@ -480,14 +585,12 @@ class Node(metaclass=NodeMeta):
 
         data = filter(lambda x: x[1] is not None, data)
 
-        # annotations = get_type_hints(
-        #     instance.__class__, globalns=globals(), localns=localns
-        # )
         annotations = (
-            instance.obj._annotations if is_facets(instance) else instance._annotations
+            instance.obj._annotations
+            if is_facets(instance)
+            else instance._annotations
         )
         for key, value in data:
-            # raise Exception((key, value))
             if (
                 is_facets(instance)
                 or key in annotations.keys()
@@ -497,7 +600,9 @@ class Node(metaclass=NodeMeta):
                 if isinstance(value, (str, int, float, bool)):
                     obj[key] = value
                 elif issubclass(value.__class__, Node):
-                    explode = depth < max_depth if max_depth is not None else True
+                    explode = (
+                        depth < max_depth if max_depth is not None else True
+                    )
                     if explode:
                         obj[key] = cls._explode(
                             value, depth=(depth + 1), max_depth=max_depth
@@ -505,10 +610,14 @@ class Node(metaclass=NodeMeta):
                     else:
                         obj[key] = str(value)
                 elif isinstance(value, (list,)):
-                    explode = depth < max_depth if max_depth is not None else True
+                    explode = (
+                        depth < max_depth if max_depth is not None else True
+                    )
                     if explode:
                         obj[key] = [
-                            cls._explode(x, depth=(depth + 1), max_depth=max_depth)
+                            cls._explode(
+                                x, depth=(depth + 1), max_depth=max_depth
+                            )
                             for x in value
                         ]
                     else:
@@ -534,25 +643,34 @@ class Node(metaclass=NodeMeta):
         return obj
 
     @classmethod
-    def create(cls, **kwargs):
+    def create(cls, **kwargs) -> Node:
+        """
+        Constructor for creating a node.
+        """
         instance = cls()
         for k, v in kwargs.items():
             setattr(instance, k, v)
         return instance
 
     @staticmethod
-    def _is_node_type(cls):
+    def _is_node_type(cls) -> bool:
         """Check if a class is a <class 'Node'>"""
         return inspect.isclass(cls) and issubclass(cls, Node)
 
-    def _generate_uid(self):
+    def _generate_uid(self) -> str:
         i = next(self._i)
         yield f"unsaved.{i}"
 
-    def to_json(self, include=None):
+    def to_json(self, include: List[str] = None) -> Dict[str, Any]:
+        # TODO:
+        # - Should this be renamed? It is a little misleading. Perhaps to_dict()
+        #   would make more sense.
         return self.__class__._explode(self, include=include)
 
-    def stage(self):
+    def stage(self) -> None:
+        """
+        Identify a node instance that it is primed and ready to be migrated
+        """
         self.edges = {}
 
         for arg, _ in self._annotations.items():
@@ -562,7 +680,11 @@ class Node(metaclass=NodeMeta):
                     self.edges[arg] = val
         self._staged[self.uid] = self
 
-    def save(self, client=None, host=None, port=None):
+    def save(
+        self, client: PyDiggyClient = None, host: str = None, port: int = None
+    ) -> None:
+        # TODO:
+        # - User self._annotations
         localns = {x.__name__: x for x in Node._nodes}
         localns.update({"List": List, "Union": Union, "Tuple": Tuple})
         annotations = get_type_hints(self, globalns=globals(), localns=localns)
@@ -572,7 +694,10 @@ class Node(metaclass=NodeMeta):
 
         def _make_obj(node, pred, obj):
             annotation = annotations.get(pred, "")
-            if hasattr(annotation, "__origin__") and annotation.__origin__ == list:
+            if (
+                hasattr(annotation, "__origin__")
+                and annotation.__origin__ == list
+            ):
                 annotation = annotation.__args__[0]
 
             try:
@@ -593,7 +718,9 @@ class Node(metaclass=NodeMeta):
                         and passed not in staged
                         and not isinstance(passed, int)
                     ):
-                        raise NotStaged(f"<{node.__class__.__name__} {pred}={obj}>")
+                        raise NotStaged(
+                            f"<{node.__class__.__name__} {pred}={obj}>"
+                        )
             except ValueError:
                 raise ValueError(
                     f"Incorrect value type. Received <{node.__class__.__name__} {pred}={obj}>. Expecting <{node.__class__.__name__} {pred}={annotation.__name__}>"
@@ -607,7 +734,9 @@ class Node(metaclass=NodeMeta):
         setters = []
         deleters = []
 
-        saveable = (x for x in self._dirty if x != "computed" and x in annotations)
+        saveable = (
+            x for x in self._dirty if x != "computed" and x in annotations
+        )
 
         for pred in saveable:
             obj = getattr(self, pred)
@@ -668,8 +797,6 @@ class Node(metaclass=NodeMeta):
         set_mutations = "\n".join(setters)
         delete_mutations = "\n".join(deleters)
         transaction = client.txn()
-        # print('set', set_mutations)
-        # print('delete', delete_mutations)
 
         try:
             if set_mutations or delete_mutations:

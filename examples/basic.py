@@ -11,7 +11,7 @@ from pydiggy import (
     index,
     lang,
     reverse,
-    types,
+    _types as types,
     upsert,
 )
 
