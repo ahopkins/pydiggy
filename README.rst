@@ -140,7 +140,7 @@ The result:
         }
     }
 
-HYDATE FROM JSON TO PYTHON OBJECTS
+HYDRATE FROM JSON TO PYTHON OBJECTS
 ----------------------------------
 
 Given some response from Dgraph:
