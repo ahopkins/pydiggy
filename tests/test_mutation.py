@@ -54,3 +54,21 @@ _:unsaved.1 <borders> _:unsaved.0 ."""  # noqa
 
     pprint.pprint(mutation)
     assert control == mutation
+
+
+def test__mutation__with__quotes(RegionClass):
+    Region = RegionClass
+
+    Region._reset()
+
+    florida = Region(name="Florida \'The \"Sunshine\" State\'")
+
+    florida.stage()
+
+    mutation = generate_mutation()
+
+    control = """_:unsaved.0 <Region> "true" .
+_:unsaved.0 <_type> "Region" .
+_:unsaved.0 <name> "Florida 'The \\"Sunshine\\" State'" ."""
+
+    assert mutation == control

@@ -1,3 +1,5 @@
+import re
+
 def _parse_subject(uid):
     if isinstance(uid, int):
         return f"<{hex(uid)}>", uid
@@ -6,7 +8,11 @@ def _parse_subject(uid):
 
 
 def _rdf_value(value):
+    """
+    Translates a value into a string annotated with an RDF type
+    """
     if isinstance(value, str):
+        value = re.sub('"','\\"', value.rstrip())
         value = f'"{value}"'
     elif isinstance(value, bool):
         value = f'"{str(value).lower()}"'

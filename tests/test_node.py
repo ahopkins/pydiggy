@@ -48,3 +48,21 @@ def test__node__to__json(RegionClass):
     ]
 
     assert regions == control
+
+
+def test__node__with__quotes(RegionClass):
+    Region = RegionClass
+
+    Region._reset()
+
+    florida = Region(name="Florida \'The \"Sunshine\" State\'")
+
+    regions = Node.json().get("Region")
+
+    control = [
+    {'_type': 'Region',
+    'name': 'Florida \'The "Sunshine" State\'',
+    'uid': 'unsaved.0'}
+    ]
+
+    assert regions == control
