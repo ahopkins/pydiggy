@@ -1,4 +1,5 @@
 import json as _json
+import re
 from datetime import datetime
 from enum import Enum
 from typing import List, Tuple, Union, get_type_hints, Dict, Any
@@ -11,11 +12,11 @@ from pydiggy.utils import _parse_subject, _raw_value
 
 
 def _make_obj(node, pred, obj):
-    localns = {x.__name__: x for x in Node._nodes}
-    localns.update({"List": List, "Union": Union, "Tuple": Tuple})
-    annotations = get_type_hints(node, globalns=globals(), localns=localns)
-    annotation = annotations.get(pred, "")
-    if hasattr(annotation, "__origin__") and annotation.__origin__ == list:
+    annotation = node._annotations.get(pred, "")
+    if (
+        hasattr(annotation, "__origin__")
+        and annotation.__origin__ == list
+    ):
         annotation = annotation.__args__[0]
 
     if issubclass(obj.__class__, Enum):
@@ -51,6 +52,7 @@ def _make_obj(node, pred, obj):
         elif isinstance(obj, datetime):
             obj = f'"{obj.isoformat()}"'
         else:
+            obj = re.sub('"','\\"', obj.rstrip())
             obj = f'"{obj}"'
     except ValueError:
         raise ValueError(

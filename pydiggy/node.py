@@ -693,6 +693,7 @@ class Node(metaclass=NodeMeta):
             client = get_client(host=host, port=9080)
 
         def _make_obj(node, pred, obj):
+            #TODO: Remove this in favor of the _make_obj in operations
             annotation = annotations.get(pred, "")
             if (
                 hasattr(annotation, "__origin__")
@@ -702,6 +703,7 @@ class Node(metaclass=NodeMeta):
 
             try:
                 if annotation == str:
+                    obj = re.sub('"','\\"', obj.rstrip())
                     obj = f'"{obj}"'
                 elif annotation == bool:
                     obj = f'"{str(obj).lower()}"'
