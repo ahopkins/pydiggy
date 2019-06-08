@@ -1,4 +1,4 @@
-from pydiggy import operations
+from pydiggy import operations, NodeTypeRegistry
 
 
 def test__parse_subject():
@@ -13,7 +13,7 @@ def test__parse_subject():
 
 
 def test__make_obj(TypeTestClass):
-    TypeTestClass._reset()
+    NodeTypeRegistry._reset()
     node = TypeTestClass()
     node.stage()
 

@@ -1,12 +1,9 @@
-from pydiggy import Facets, generate_mutation
-
-# import pytest
-
+from pydiggy import Facets, generate_mutation, NodeTypeRegistry
 
 def test_mutations(RegionClass):
     Region = RegionClass
 
-    Region._reset()
+    NodeTypeRegistry._reset()
 
     por = Region(uid=0x11, name="Portugal")
     spa = Region(uid=0x12, name="Spain")
@@ -59,7 +56,7 @@ _:unsaved.1 <borders> _:unsaved.0 ."""  # noqa
 def test__mutation__with__quotes(RegionClass):
     Region = RegionClass
 
-    Region._reset()
+    NodeTypeRegistry._reset()
 
     florida = Region(name="Florida \'The \"Sunshine\" State\'")
 

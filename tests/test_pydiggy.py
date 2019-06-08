@@ -6,7 +6,7 @@
 import pytest
 from click.testing import CliRunner
 
-from pydiggy import Node, cli
+from pydiggy import Node, cli, NodeTypeRegistry
 
 
 @pytest.fixture
@@ -24,7 +24,7 @@ def test_command_line_interface_has_commands(runner, commands):
 
 
 def test_dry_run_generate_schema(runner):
-    Node._nodes = []
+    NodeTypeRegistry._node_types = []
     result = runner.invoke(cli.main, ["generate", "tests.fakeapp", "--no-run"])
     assert result.exit_code == 0
     assert "Nodes found: (1)" in result.output

@@ -4,13 +4,13 @@ Create a test to make sure that no __annotations__ startswith('_')
 # import pytest
 from pprint import pprint as print
 
-from pydiggy import Facets, Node
+from pydiggy import Facets, Node, NodeTypeRegistry
 
 
 def test__node__to__json(RegionClass):
     Region = RegionClass
 
-    Region._reset()
+    NodeTypeRegistry._reset()
 
     por = Region(uid=0x11, name="Portugal")
     spa = Region(uid=0x12, name="Spain")
@@ -22,7 +22,7 @@ def test__node__to__json(RegionClass):
     gas.borders = [Facets(spa, foo="bar", hello="world"), mar]
     mar.borders = [spa, gas]
 
-    regions = Node.json().get("Region")
+    regions = NodeTypeRegistry.json().get("Region")
 
     control = [
         {"_type": "Region", "borders": "[<Region:18>]", "name": "Portugal", "uid": 17},
@@ -53,11 +53,11 @@ def test__node__to__json(RegionClass):
 def test__node__with__quotes(RegionClass):
     Region = RegionClass
 
-    Region._reset()
+    NodeTypeRegistry._reset()
 
     florida = Region(name="Florida \'The \"Sunshine\" State\'")
 
-    regions = Node.json().get("Region")
+    regions = NodeTypeRegistry.json().get("Region")
 
     control = [
     {'_type': 'Region',

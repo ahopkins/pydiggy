@@ -8,6 +8,7 @@ from pydgraph import Operation
 
 from pydiggy.connection import get_client
 from pydiggy.node import Node
+from pydiggy.node_type_registry import NodeTypeRegistry
 
 
 @click.group()
@@ -40,12 +41,12 @@ def generate(module, run, host, port):
     click.echo(f"Generating schema for: {module}")
     importlib.import_module(module)
 
-    num_nodes = len(Node._nodes)
+    num_nodes = len(NodeTypeRegistry._node_types)
     click.echo(f"\nNodes found: ({num_nodes})")
-    for node in Node._nodes:
+    for node in NodeTypeRegistry._node_types:
         click.echo(f"    - {node._get_name()}")
 
-    schema, unknown = Node._generate_schema()
+    schema, unknown = NodeTypeRegistry._generate_schema()
 
     if not run:
         click.echo("\nYour schema:\n~~~~~~~~\n")
