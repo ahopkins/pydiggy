@@ -26,6 +26,11 @@ class Tokenizer(DirectiveArgument):
 
 
 class Directive:
+    """
+    A directive adds extra instructions to a schema or query. Annotated
+    with the '@' symbol and optional arguments in parens.
+    """
+
     def __str__(self):
         args = []
         if "__annotations__" in self.__class__.__dict__:
@@ -78,7 +83,7 @@ count = type("count", (Directive,), {})
 upsert = type("upsert", (Directive,), {})
 lang = type("lang", (Directive,), {})
 
-DGRAPH_TYPES = {  # Unsupported dgraph type: password, geo
+DGRAPH_TYPES = {  # TODO: add dgraph type 'password'
     "uid": "uid",
     "geo": "geo",
     "str": "string",

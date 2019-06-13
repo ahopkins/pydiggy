@@ -1,20 +1,18 @@
 import json as _json
+import re
 from datetime import datetime
 from enum import Enum
 from typing import List, Tuple, Union, get_type_hints, Dict, Any
 
 from pydiggy.connection import get_client, PyDiggyClient
 from pydiggy.exceptions import NotStaged
-from pydiggy.node import Node
+from pydiggy.node import Node, NodeTypeRegistry
 from pydiggy._types import *  # noqa
 from pydiggy.utils import _parse_subject, _raw_value
 
 
 def _make_obj(node, pred, obj):
-    localns = {x.__name__: x for x in Node._nodes}
-    localns.update({"List": List, "Union": Union, "Tuple": Tuple})
-    annotations = get_type_hints(node, globalns=globals(), localns=localns)
-    annotation = annotations.get(pred, "")
+    annotation = node._annotations.get(pred, "")
     if hasattr(annotation, "__origin__") and annotation.__origin__ == list:
         annotation = annotation.__args__[0]
 
@@ -24,9 +22,9 @@ def _make_obj(node, pred, obj):
     # TODO:
     # - integreate utils._rdf_value
     try:
-        if Node._is_node_type(obj.__class__):
+        if NodeTypeRegistry._is_node_type(obj.__class__):
             uid, passed = _parse_subject(obj.uid)
-            staged = Node._get_staged()
+            staged = NodeTypeRegistry._get_staged()
 
             if (
                 uid not in staged
@@ -51,6 +49,7 @@ def _make_obj(node, pred, obj):
         elif isinstance(obj, datetime):
             obj = f'"{obj.isoformat()}"'
         else:
+            obj = re.sub('"', '\\"', obj.rstrip())
             obj = f'"{obj}"'
     except ValueError:
         raise ValueError(
@@ -129,14 +128,14 @@ def hydrate(data: str, types: List[Node] = None) -> Dict[str, List[Node]]:
 
     output = {}
     # data = data.get(data_set)
-    registered = {x.__name__: x for x in Node._nodes}
+    registered = {x.__name__: x for x in NodeTypeRegistry._node_types}
 
     for func_name, raw_data in data.items():
         hydrated = []
         for raw in raw_data:
             if "_type" in raw and raw.get("_type") in registered:
                 cls = registered.get(raw.get("_type"))
-                hydrated.append(cls._hydrate(raw, types=types))
+                hydrated.append(NodeTypeRegistry._hydrate(raw, types=types))
 
         output[func_name] = hydrated
 
