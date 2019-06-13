@@ -267,6 +267,15 @@ class Node(metaclass=NodeMeta):
                         orig, reverse_name, self, directive.many, remove=True
                     )
 
+    @classmethod
+    def create(cls, **kwargs) -> Node:
+        """
+        Constructor for creating a node.
+        """
+        instance = cls()
+        for k, v in kwargs.items():
+            setattr(instance, k, v)
+        return instance
 
     @classmethod
     def _explode(
