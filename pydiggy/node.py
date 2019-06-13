@@ -136,6 +136,10 @@ class Node(metaclass=NodeMeta):
     _instances = dict()
     _staged = dict()
 
+    # uid is not used as a class variable, it is part of the required
+    # schema of a Node, and is thus part of the superclass.
+    uid : int
+
     @classmethod
     def _get_staged(cls):
         return cls._staged
