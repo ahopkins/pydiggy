@@ -6,8 +6,7 @@ __author__ = """Adam Hopkins"""
 __email__ = "admhpkns@gmail.com"
 __version__ = "0.1.0"
 
-from pydiggy.node import Facets, Node, is_facets
-from pydiggy.node_type_registry import get_node_type, NodeTypeRegistry
+from pydiggy.node import Facets, Node, is_facets, get_node_type, NodeTypeRegistry
 from pydiggy.operations import generate_mutation, hydrate, query, run_mutation
 from pydiggy._types import count, exact, geo, index, lang, reverse, uid, upsert
 

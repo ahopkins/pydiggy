@@ -7,8 +7,7 @@ import click
 from pydgraph import Operation
 
 from pydiggy.connection import get_client
-from pydiggy.node import Node
-from pydiggy.node_type_registry import NodeTypeRegistry
+from pydiggy.node import Node, NodeTypeRegistry
 
 
 @click.group()

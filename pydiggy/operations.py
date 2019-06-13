@@ -6,8 +6,7 @@ from typing import List, Tuple, Union, get_type_hints, Dict, Any
 
 from pydiggy.connection import get_client, PyDiggyClient
 from pydiggy.exceptions import NotStaged
-from pydiggy.node import Node
-from pydiggy.node_type_registry import NodeTypeRegistry
+from pydiggy.node import Node, NodeTypeRegistry
 from pydiggy._types import *  # noqa
 from pydiggy.utils import _parse_subject, _raw_value
 
