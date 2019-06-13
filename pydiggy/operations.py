@@ -13,10 +13,7 @@ from pydiggy.utils import _parse_subject, _raw_value
 
 def _make_obj(node, pred, obj):
     annotation = node._annotations.get(pred, "")
-    if (
-        hasattr(annotation, "__origin__")
-        and annotation.__origin__ == list
-    ):
+    if hasattr(annotation, "__origin__") and annotation.__origin__ == list:
         annotation = annotation.__args__[0]
 
     if issubclass(obj.__class__, Enum):
@@ -52,7 +49,7 @@ def _make_obj(node, pred, obj):
         elif isinstance(obj, datetime):
             obj = f'"{obj.isoformat()}"'
         else:
-            obj = re.sub('"','\\"', obj.rstrip())
+            obj = re.sub('"', '\\"', obj.rstrip())
             obj = f'"{obj}"'
     except ValueError:
         raise ValueError(

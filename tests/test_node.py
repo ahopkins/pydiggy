@@ -55,14 +55,16 @@ def test__node__with__quotes(RegionClass):
 
     NodeTypeRegistry._reset()
 
-    florida = Region(name="Florida \'The \"Sunshine\" State\'")
+    florida = Region(name="Florida 'The \"Sunshine\" State'")
 
     regions = NodeTypeRegistry.json().get("Region")
 
     control = [
-    {'_type': 'Region',
-    'name': 'Florida \'The "Sunshine" State\'',
-    'uid': 'unsaved.0'}
+        {
+            "_type": "Region",
+            "name": "Florida 'The \"Sunshine\" State'",
+            "uid": "unsaved.0",
+        }
     ]
 
     assert regions == control

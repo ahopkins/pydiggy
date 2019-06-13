@@ -111,9 +111,7 @@ class BaseAbstract(Node, is_abstract=True):
             return NoneNode() if single else [NoneNode()]
 
         if single and item.__class__.__name__ != cls.__name__:
-            raise Exception(
-                f"Found {item.__class__.__name__}, and not {cls.__name__}."
-            )
+            raise Exception(f"Found {item.__class__.__name__}, and not {cls.__name__}.")
 
         return item
 
@@ -137,9 +135,7 @@ class BaseAbstract(Node, is_abstract=True):
             else:
                 return fltr.format(value)
 
-        filters = [
-            make_filter(k, v) for k, v in kwargs.items() if k in cls._filters
-        ]
+        filters = [make_filter(k, v) for k, v in kwargs.items() if k in cls._filters]
         if hasattr(cls, "_required_filters"):
             filters += list(cls._required_filters)
         filters = " and ".join((filter(lambda x: x, filters)))
@@ -194,10 +190,7 @@ class Person(BaseAbstract):
             "other": f'eq(gender, "{Gender.OTHER.value}")',
         },
         "family": ("family", "uid(family)"),
-        "living": {
-            "true": "(not has(death_year))",
-            "false": "has(death_year)",
-        },
+        "living": {"true": "(not has(death_year))", "false": "has(death_year)"},
     }
     _subqueries = {
         "family": """
@@ -284,16 +277,8 @@ class Person(BaseAbstract):
 
     @classmethod
     def _get_parents(cls, person, step=1):
-        father = (
-            Person.get(person.father.uid)
-            if hasattr(person, "father")
-            else None
-        )
-        mother = (
-            Person.get(person.mother.uid)
-            if hasattr(person, "mother")
-            else None
-        )
+        father = Person.get(person.father.uid) if hasattr(person, "father") else None
+        mother = Person.get(person.mother.uid) if hasattr(person, "mother") else None
         generation = [
             {"person": father, "step": step},
             {"person": mother, "step": step},
@@ -317,6 +302,4 @@ class Person(BaseAbstract):
 
     @property
     def ancestors(self):
-        return [{"person": self, "step": 0}] + self.__class__._get_parents(
-            self
-        )
+        return [{"person": self, "step": 0}] + self.__class__._get_parents(self)

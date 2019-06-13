@@ -1,5 +1,6 @@
 from pydiggy import Facets, generate_mutation, NodeTypeRegistry
 
+
 def test_mutations(RegionClass):
     Region = RegionClass
 
@@ -58,7 +59,7 @@ def test__mutation__with__quotes(RegionClass):
 
     NodeTypeRegistry._reset()
 
-    florida = Region(name="Florida \'The \"Sunshine\" State\'")
+    florida = Region(name="Florida 'The \"Sunshine\" State'")
 
     florida.stage()
 

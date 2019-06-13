@@ -8,7 +8,7 @@ def test__parse_subject():
     subject = operations._parse_subject(123)
     assert subject == ("<0x7b>", 123)
 
-    subject = operations._parse_subject(0x7b)
+    subject = operations._parse_subject(0x7B)
     assert subject == ("<0x7b>", 123)
 
 

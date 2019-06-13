@@ -83,8 +83,7 @@ def get_node_type(name: str) -> Node:
 
 
 def _force_instance(
-    directive: Union[Directive, reverse, count, upsert, lang],
-    prop_type: str = None,
+    directive: Union[Directive, reverse, count, upsert, lang], prop_type: str = None
 ) -> Directive:
     # TODO:
     # - Make sure directive is an instance of, or a class defined as a directive
@@ -104,9 +103,7 @@ def _force_instance(
 
 class NodeMeta(type):
     def __new__(cls, name, bases, attrs, **kwargs):
-        directives = [
-            x for x in attrs if x in attrs.get("__annotations__", {}).keys()
-        ]
+        directives = [x for x in attrs if x in attrs.get("__annotations__", {}).keys()]
         attrs["_directives"] = dict()
         attrs["_instances"] = dict()
 
@@ -138,7 +135,6 @@ class NodeMeta(type):
 class Node(metaclass=NodeMeta):
     _instances = dict()
     _staged = dict()
-
 
     @classmethod
     def _get_staged(cls):
@@ -212,8 +208,7 @@ class Node(metaclass=NodeMeta):
         return hash(self.uid)
 
     def __getattr__(self, attribute):
-        if (not attribute == "__annotations__")\
-            and (attribute in self.__annotations__):
+        if (not attribute == "__annotations__") and (attribute in self.__annotations__):
             raise MissingAttribute(self, attribute)
         super().__getattribute__(attribute)
 
@@ -229,17 +224,13 @@ class Node(metaclass=NodeMeta):
         orig = self.__dict__.get(name, None)
         self.__dict__[name] = value
         # TODO: This causes issues with Node types that want private variables
-        if hasattr(self, "_init")\
-            and self._init\
-            and not name.startswith("_"):
+        if hasattr(self, "_init") and self._init and not name.startswith("_"):
             self._dirty.add(name)
         if name in self._directives and any(
             isinstance(d, reverse) for d in self._directives[name]
         ):
             directive = list(
-                filter(
-                    lambda d: isinstance(d, reverse), self._directives[name]
-                )
+                filter(lambda d: isinstance(d, reverse), self._directives[name])
             )[0]
             reverse_name = directive.name if directive.name else f"_{name}"
 
@@ -274,9 +265,7 @@ class Node(metaclass=NodeMeta):
                 if value is not None:
                     _assign(value, reverse_name, self, directive.many)
                 elif orig:
-                    _assign(
-                        orig, reverse_name, self, directive.many, remove=True
-                    )
+                    _assign(orig, reverse_name, self, directive.many, remove=True)
 
     @classmethod
     def create(cls, **kwargs) -> Node:
@@ -320,9 +309,7 @@ class Node(metaclass=NodeMeta):
         data = filter(lambda x: x[1] is not None, data)
 
         annotations = (
-            instance.obj._annotations
-            if is_facets(instance)
-            else instance._annotations
+            instance.obj._annotations if is_facets(instance) else instance._annotations
         )
         for key, value in data:
             if (
@@ -334,9 +321,7 @@ class Node(metaclass=NodeMeta):
                 if isinstance(value, (str, int, float, bool)):
                     obj[key] = value
                 elif issubclass(value.__class__, Node):
-                    explode = (
-                        depth < max_depth if max_depth is not None else True
-                    )
+                    explode = depth < max_depth if max_depth is not None else True
                     if explode:
                         obj[key] = cls._explode(
                             value, depth=(depth + 1), max_depth=max_depth
@@ -344,14 +329,10 @@ class Node(metaclass=NodeMeta):
                     else:
                         obj[key] = str(value)
                 elif isinstance(value, (list,)):
-                    explode = (
-                        depth < max_depth if max_depth is not None else True
-                    )
+                    explode = depth < max_depth if max_depth is not None else True
                     if explode:
                         obj[key] = [
-                            cls._explode(
-                                x, depth=(depth + 1), max_depth=max_depth
-                            )
+                            cls._explode(x, depth=(depth + 1), max_depth=max_depth)
                             for x in value
                         ]
                     else:
@@ -408,17 +389,14 @@ class Node(metaclass=NodeMeta):
             client = get_client(host=host, port=9080)
 
         def _make_obj(node, pred, obj):
-            #TODO: Remove this in favor of the _make_obj in operations
+            # TODO: Remove this in favor of the _make_obj in operations
             annotation = annotations.get(pred, "")
-            if (
-                hasattr(annotation, "__origin__")
-                and annotation.__origin__ == list
-            ):
+            if hasattr(annotation, "__origin__") and annotation.__origin__ == list:
                 annotation = annotation.__args__[0]
 
             try:
                 if annotation == str:
-                    obj = re.sub('"','\\"', obj.rstrip())
+                    obj = re.sub('"', '\\"', obj.rstrip())
                     obj = f'"{obj}"'
                 elif annotation == bool:
                     obj = f'"{str(obj).lower()}"'
@@ -435,9 +413,7 @@ class Node(metaclass=NodeMeta):
                         and passed not in staged
                         and not isinstance(passed, int)
                     ):
-                        raise NotStaged(
-                            f"<{node.__class__.__name__} {pred}={obj}>"
-                        )
+                        raise NotStaged(f"<{node.__class__.__name__} {pred}={obj}>")
             except ValueError:
                 raise ValueError(
                     f"Incorrect value type. Received <{node.__class__.__name__} {pred}={obj}>. Expecting <{node.__class__.__name__} {pred}={annotation.__name__}>"
@@ -451,9 +427,7 @@ class Node(metaclass=NodeMeta):
         setters = []
         deleters = []
 
-        saveable = (
-            x for x in self._dirty if x != "computed" and x in annotations
-        )
+        saveable = (x for x in self._dirty if x != "computed" and x in annotations)
 
         for pred in saveable:
             obj = getattr(self, pred)
@@ -525,8 +499,6 @@ class Node(metaclass=NodeMeta):
             transaction.discard()
 
 
-
-
 class NodeTypeRegistry:
     _i = _count()
     _node_types = []
@@ -589,33 +561,24 @@ class NodeTypeRegistry:
                     prop_type = prop_type.__args__[0]
 
                 prop_type = PropType(
-                    prop_type,
-                    is_list_type,
-                    node._directives.get(prop_name, []),
+                    prop_type, is_list_type, node._directives.get(prop_name, [])
                 )
 
                 if prop_name in edges:
-                    if prop_type != edges.get(
-                        prop_name
-                    ) and not cls._is_node_type(prop_type[0]):
+                    if prop_type != edges.get(prop_name) and not cls._is_node_type(
+                        prop_type[0]
+                    ):
 
                         # Check if there is a type conflict
                         if (
-                            edges.get(prop_name).directives
-                            != prop_type.directives
+                            edges.get(prop_name).directives != prop_type.directives
                             and all(
-                                (
-                                    inspect.isclass(x)
-                                    and issubclass(x, Directive)
-                                )
+                                (inspect.isclass(x) and issubclass(x, Directive))
                                 or issubclass(x.__class__, Directive)
                                 for x in edges.get(prop_name).directives
                             )
                             and all(
-                                (
-                                    inspect.isclass(x)
-                                    and issubclass(x, Directive)
-                                )
+                                (inspect.isclass(x) and issubclass(x, Directive))
                                 or issubclass(x.__class__, Directive)
                                 for x in prop_type.directives
                             )
@@ -631,9 +594,7 @@ class NodeTypeRegistry:
                     edges[prop_name] = prop_type
                 elif cls._is_node_type(prop_type[0]):
                     edges[prop_name] = PropType(
-                        "uid",
-                        is_list_type,
-                        node._directives.get(prop_name, []),
+                        "uid", is_list_type, node._directives.get(prop_name, [])
                     )
                 else:
                     if prop_name != "uid":
@@ -695,7 +656,7 @@ class NodeTypeRegistry:
     @classmethod
     def _hydrate(
         cls, raw: Dict[str, Any], types: Dict[str, Node] = None
-    ) -> Node: # -> Dict[str: List[Node]]
+    ) -> Node:  # -> Dict[str: List[Node]]
         # TODO:
         # - Accept types that are passed. Loop thru them and register if needed
         #   and raising an exception if they are not valid.
@@ -723,14 +684,10 @@ class NodeTypeRegistry:
             computed = {}
 
             pred_items = [
-                (pred, value)
-                for pred, value in raw.items()
-                if not pred.startswith("_")
+                (pred, value) for pred, value in raw.items() if not pred.startswith("_")
             ]
 
-            annotations = get_type_hints(
-                k, globalns=globals(), localns=localns
-            )
+            annotations = get_type_hints(k, globalns=globals(), localns=localns)
             for pred, value in pred_items:
                 """
                 The pred falls into one of three categories:
@@ -773,9 +730,7 @@ class NodeTypeRegistry:
                         for x in value:
                             keys = deepcopy(list(x.keys()))
                             value_facet_data = [
-                                (k.split("|")[1], x.pop(k))
-                                for k in keys
-                                if "|" in k
+                                (k.split("|")[1], x.pop(k)) for k in keys if "|" in k
                             ]
                             item = NodeTypeRegistry._hydrate(x)
 
@@ -784,11 +739,7 @@ class NodeTypeRegistry:
                             delay.append((item, p, value_facet_data))
                     elif isinstance(value, dict):
                         delay.append(
-                            (
-                                get_node(value.get("_type"))._hydrate(value),
-                                p,
-                                None,
-                            )
+                            (get_node(value.get("_type"))._hydrate(value), p, None)
                         )
                 else:
                     if pred.endswith("_uid"):
