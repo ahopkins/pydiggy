@@ -299,7 +299,7 @@ class Node(metaclass=NodeMeta):
 
     @classmethod
     def _reset(cls) -> None:
-        cls._i = count()
+        cls._i = _count()
         cls._instances = dict()
 
     @classmethod
@@ -602,7 +602,7 @@ class Node(metaclass=NodeMeta):
         include: List[str] = None,
     ) -> Dict[str, Any]:
         """
-        Explode a Node object into a mapping 
+        Explode a Node object into a mapping
         """
         # TODO:
         # - Candidate for refactoring
