@@ -57,7 +57,9 @@ _bool = type("_bool", (Tokenizer,), {})
 
 
 class index(Directive):
-    tokenizer: Union[_hash, exact, term, fulltext, trigram, _int, _float, _bool]
+    tokenizer: Union[
+        _hash, exact, term, fulltext, trigram, _int, _float, _bool
+    ]
 
     def __init__(self, tokenizer=None):
         self.tokenizer = tokenizer
@@ -67,11 +69,13 @@ class reverse(Directive):
     name: Optional[str]
     many: bool
     with_facets: bool
+    reverse_with: str
 
     def __init__(self, name=None, many=False, with_facets=False):
         self.name = name
         self.many = many
         self.with_facets = with_facets
+        self.reverse_with = None
 
 
 count = type("count", (Directive,), {})

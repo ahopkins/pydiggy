@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import copy
+import re
 import inspect
 import json
 from collections import namedtuple
@@ -34,7 +35,6 @@ from pydiggy._types import (
     geo,
     reverse,
     uid,
-    reverse,
     count,
     upsert,
     lang,
@@ -89,6 +89,15 @@ def _force_instance(
     return directive(*args)
 
 
+def extract_type(p_type):
+    if "[" in p_type:
+        regex = r"\[(\w+)\]"
+        matches = re.search(regex, p_type)
+        return matches.group(1)
+    else:
+        return p_type
+
+
 def get_node(name: str) -> Node:
     """
     Retrieve a registered node class.
@@ -102,6 +111,21 @@ def get_node(name: str) -> Node:
     return registered.get(name, None)
 
 
+class ReverseRegistry(dict):
+    _singleton = None
+
+    def __new__(cls, *args, **kwargs):
+        if cls._singleton is None:
+            cls._singleton = super().__new__(cls, *args, **kwargs)
+        return cls._singleton
+
+    def __setattr__(self, key, value):
+        if key in self:
+            raise Exception(">>>>")
+        else:
+            super().__setattr__(key, value)
+
+
 class NodeMeta(type):
     def __new__(cls, name, bases, attrs, **kwargs):
         directives = [
@@ -109,11 +133,13 @@ class NodeMeta(type):
         ]
         attrs["_directives"] = dict()
         attrs["_instances"] = dict()
+        attrs["_reverses"] = set()
 
         for base in bases:
             attrs["_directives"].update(base._directives)
 
         for directive in directives:
+            d_key = copy.deepcopy(directive)
             d = copy.deepcopy(attrs.get(directive))
             attrs.pop(directive)
 
@@ -131,6 +157,17 @@ class NodeMeta(type):
             d = map(lambda x: _force_instance(x, prop_type), d)
 
             attrs["_directives"][directive] = tuple(d)
+
+            for d_obj in attrs["_directives"][directive]:
+                if isinstance(d_obj, reverse):
+                    reverse_with = extract_type(
+                        attrs.get("__annotations__", {}).get(d_key)
+                    )
+                    query_name = f"~{d_key}"
+                    reverse_name = d_obj.name if d_obj.name else f"_{d_key}"
+                    ReverseRegistry(
+                        {f"{reverse_with}.{query_name}.{name}": reverse_name}
+                    )
 
         return super().__new__(cls, name, bases, attrs, **kwargs)
 
@@ -222,6 +259,8 @@ class Node(metaclass=NodeMeta):
                 )
             )[0]
             reverse_name = directive.name if directive.name else f"_{name}"
+            if reverse_name not in self.__class__._reverses:
+                value.__class__._reverses.add(reverse_name)
 
             def _assign(obj, key, value, do_many, remove=False):
                 o = obj.obj if is_facets(obj) else obj
@@ -548,7 +587,7 @@ class Node(metaclass=NodeMeta):
         # - Instrad of being a List[Node], it should probably be a Set
         return {
             x.__name__: list(
-                map(partial(cls._explode, max_depth=0), x._instances.values())
+                map(partial(cls._explode, max_depth=1), x._instances.values())
             )
             for x in cls._nodes
             if len(x._instances) > 0
@@ -558,7 +597,7 @@ class Node(metaclass=NodeMeta):
     def _explode(
         cls,
         instance: Node,
-        max_depth: Optional[int] = None,
+        max_depth: int = 1,
         depth: int = 0,
         include: List[str] = None,
     ) -> Dict[str, Any]:
@@ -573,7 +612,7 @@ class Node(metaclass=NodeMeta):
         if not isinstance(instance, Node) and not is_facets(instance):
             if is_facets(instance):
                 return instance._asdict()
-            raise Exception("Cannot explode a non-Node object")
+            raise TypeError("Cannot explode a non-Node object")
 
         if is_facets(instance):
             data = list(instance._asdict().items())
@@ -591,12 +630,14 @@ class Node(metaclass=NodeMeta):
             else instance._annotations
         )
         for key, value in data:
-            if (
+            do_explosion = (
                 is_facets(instance)
                 or key in annotations.keys()
                 or key == "uid"
                 or (include and key in include)
-            ):
+                or key in instance.__class__._reverses
+            )
+            if do_explosion:
                 if isinstance(value, (str, int, float, bool)):
                     obj[key] = value
                 elif issubclass(value.__class__, Node):
@@ -661,11 +702,11 @@ class Node(metaclass=NodeMeta):
         i = next(self._i)
         yield f"unsaved.{i}"
 
-    def to_json(self, include: List[str] = None) -> Dict[str, Any]:
+    def to_json(self, include: List[str] = None, **kwargs) -> Dict[str, Any]:
         # TODO:
         # - Should this be renamed? It is a little misleading. Perhaps to_dict()
         #   would make more sense.
-        return self.__class__._explode(self, include=include)
+        return self.__class__._explode(self, include=include, **kwargs)
 
     def stage(self) -> None:
         """
