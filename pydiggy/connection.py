@@ -11,6 +11,14 @@ class PyDiggyClient(pydgraph.DgraphClient):
         stubs = "|".join([x.addr for x in self._clients])
         return f"<PyDiggyClient {stubs}>"
 
+    def query(self, *args, **kwargs):
+        txn = self.txn(read_only=True)
+        try:
+            result = txn.query(*args, **kwargs)
+        finally:
+            txn.discard()
+        return result
+
 
 class PyDiggyTestTransaction:
     def __init__(self, **kwargs):
@@ -28,7 +36,12 @@ class PyDiggyTestTransaction:
 
 class PyDiggyTestClient(pydgraph.DgraphClient):
     def query(
-        self, query, variables=None, timeout=None, metadata=None, credentials=None
+        self,
+        query,
+        variables=None,
+        timeout=None,
+        metadata=None,
+        credentials=None,
     ):
         # print(f"Test client:\n{query[:20]}...")
         class Result:
@@ -49,7 +62,9 @@ def get_stub(host=DEFAULT_DGRAPH_HOST, port=DEFAULT_DGRAPH_PORT):  # noqa
     return stub
 
 
-def get_client(host=DEFAULT_DGRAPH_HOST, port=DEFAULT_DGRAPH_PORT, test=False):  # noqa
+def get_client(
+    host=DEFAULT_DGRAPH_HOST, port=DEFAULT_DGRAPH_PORT, test=False
+):  # noqa
     if test:
         return PyDiggyTestClient(get_stub())
     stub = get_stub(host=host, port=port)

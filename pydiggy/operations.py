@@ -1,12 +1,12 @@
 import json as _json
 from datetime import datetime
 from enum import Enum
-from typing import List, Tuple, Union, get_type_hints, Dict, Any
+from typing import Any, Dict, List, Tuple, Union, get_type_hints
 
-from pydiggy.connection import get_client, PyDiggyClient
+from pydiggy._types import *  # noqa
+from pydiggy.connection import PyDiggyClient, get_client
 from pydiggy.exceptions import NotStaged
 from pydiggy.node import Node
-from pydiggy._types import *  # noqa
 from pydiggy.utils import _parse_subject, _raw_value
 
 
@@ -46,6 +46,10 @@ def _make_obj(node, pred, obj):
             obj = f'"{str(obj).lower()}"'
         elif annotation in (int,):
             obj = f'"{int(obj)}"^^<xs:int>'
+        elif annotation in (geo,):
+            if hasattr(obj, "__geojson__"):
+                obj = obj.__geojson__()
+            obj = f'"{obj}"^^<geo:geojson>'
         elif annotation in (float,) or isinstance(obj, float):
             obj = f'"{obj}"^^<xs:float>'
         elif isinstance(obj, datetime):

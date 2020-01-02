@@ -1,4 +1,4 @@
-from dataclasses import dataclass
+# from dataclasses import dataclass
 from datetime import datetime
 from decimal import Decimal
 from inspect import isclass
@@ -9,7 +9,7 @@ class uid:
     pass
 
 
-class geo:
+class geo(dict):
     pass
 
 
@@ -47,6 +47,7 @@ class Directive:
 
 
 _hash = type("_hash", (Tokenizer,), {})
+unique = type("unique", (Tokenizer,), {})
 exact = type("exact", (Tokenizer,), {})
 term = type("term", (Tokenizer,), {})
 fulltext = type("fulltext", (Tokenizer,), {})
@@ -54,11 +55,12 @@ trigram = type("trigram", (Tokenizer,), {})
 _int = type("_int", (Tokenizer,), {})
 _float = type("_float", (Tokenizer,), {})
 _bool = type("_bool", (Tokenizer,), {})
+_geo = type("_geo", (Tokenizer,), {})
 
 
 class index(Directive):
     tokenizer: Union[
-        _hash, exact, term, fulltext, trigram, _int, _float, _bool
+        _hash, exact, term, fulltext, trigram, _int, _float, _bool, _geo
     ]
 
     def __init__(self, tokenizer=None):
@@ -82,7 +84,7 @@ count = type("count", (Directive,), {})
 upsert = type("upsert", (Directive,), {})
 lang = type("lang", (Directive,), {})
 
-DGRAPH_TYPES = {  # Unsupported dgraph type: password, geo
+DGRAPH_TYPES = {  # Unsupported dgraph type: password
     "uid": "uid",
     "geo": "geo",
     "str": "string",
@@ -99,5 +101,5 @@ SELF_INSERTING_DIRECTIVE_ARGS = {
     (index, "int"): _int,
     (index, "float"): _float,
     (index, "bool"): _bool,
-    (index, "geo"): geo,
+    (index, "geo"): _geo,
 }

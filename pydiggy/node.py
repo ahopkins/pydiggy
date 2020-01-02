@@ -1,44 +1,25 @@
 from __future__ import annotations
 
 import copy
-import re
 import inspect
-import json
+import re
 from collections import namedtuple
 from copy import deepcopy
-from dataclasses import dataclass, field
 from datetime import datetime
-from decimal import Decimal
 from enum import Enum
-from functools import lru_cache, partial
+from functools import partial
 from itertools import count as _count
-from typing import (
-    Any,
-    Dict,
-    List,
-    Optional,
-    Tuple,
-    Union,
-    _GenericAlias,
-    get_type_hints,
-)
+from typing import (Any, Dict, List, Optional, Tuple, Union, _GenericAlias,
+                    get_type_hints)
 
-from pydiggy.connection import get_client, PyDiggyClient
-from pydiggy.exceptions import ConflictingType, InvalidData, MissingAttribute
-from pydiggy.utils import _parse_subject, _raw_value, _rdf_value
-from pydiggy._types import (
-    ACCEPTABLE_GENERIC_ALIASES,
-    ACCEPTABLE_TRANSLATIONS,
-    DGRAPH_TYPES,
-    SELF_INSERTING_DIRECTIVE_ARGS,
-    Directive,
-    geo,
-    reverse,
-    uid,
-    count,
-    upsert,
-    lang,
-)
+from pydiggy._types import ACCEPTABLE_GENERIC_ALIASES  # uid,
+from pydiggy._types import (ACCEPTABLE_TRANSLATIONS, DGRAPH_TYPES,
+                            SELF_INSERTING_DIRECTIVE_ARGS, Directive, count,
+                            geo, lang, reverse, upsert)
+from pydiggy.connection import PyDiggyClient, get_client
+from pydiggy.exceptions import (ConflictingType, InvalidData, MissingAttribute,
+                                NotStaged)
+from pydiggy.utils import _parse_subject, _raw_value
 
 PropType = namedtuple("PropType", ("prop_type", "is_list_type", "directives"))
 
@@ -191,9 +172,13 @@ class Node(metaclass=NodeMeta):
             #   is brand new (and has never been committed to the DB) or if it
             #   is being freshly generated
             uid = next(self._generate_uid())
+            self._fresh = True
+        else:
+            self._fresh = False
 
         self.uid = uid
         self._dirty = set()
+        self._pending_delete = set()
 
         # TODO:
         # - perhaps this code to generate self._annotations belongs somewhere
@@ -260,7 +245,12 @@ class Node(metaclass=NodeMeta):
             )[0]
             reverse_name = directive.name if directive.name else f"_{name}"
             if reverse_name not in self.__class__._reverses:
-                value.__class__._reverses.add(reverse_name)
+                use_class = (
+                    value[0].__class__
+                    if isinstance(value, list)
+                    else value.__class__
+                )
+                use_class._reverses.add(reverse_name)
 
             def _assign(obj, key, value, do_many, remove=False):
                 o = obj.obj if is_facets(obj) else obj
@@ -417,7 +407,7 @@ class Node(metaclass=NodeMeta):
         #             if is_list_type and type_name != 'uid':
         for edge_name, edge in edges.items():
             type_name = cls._get_type_name(edge.prop_type)
-            if edge.is_list_type and type_name != "uid":
+            if edge.is_list_type:
                 type_name = f"[{type_name}]"
 
             directives = edge.directives
@@ -525,7 +515,9 @@ class Node(metaclass=NodeMeta):
                             node = get_node(value[0].get("_type"))
                             value = node._hydrate(value[0])
                     elif isinstance(value, dict):
-                        value = cls._hydrate(value)
+                        prop_type = annotations[pred]
+                        if prop_type != geo:
+                            value = cls._hydrate(value)
 
                     if value is not None:
                         kwargs.update({pred: value})
@@ -640,6 +632,8 @@ class Node(metaclass=NodeMeta):
             if do_explosion:
                 if isinstance(value, (str, int, float, bool)):
                     obj[key] = value
+                elif isinstance(value, (datetime,)):
+                    obj[key] = value.astimezone().isoformat()
                 elif issubclass(value.__class__, Node):
                     explode = (
                         depth < max_depth if max_depth is not None else True
@@ -698,6 +692,10 @@ class Node(metaclass=NodeMeta):
         """Check if a class is a <class 'Node'>"""
         return inspect.isclass(cls) and issubclass(cls, Node)
 
+    @property
+    def _type(self):
+        return self.__class__.__name__
+
     def _generate_uid(self) -> str:
         i = next(self._i)
         yield f"unsaved.{i}"
@@ -708,7 +706,7 @@ class Node(metaclass=NodeMeta):
         #   would make more sense.
         return self.__class__._explode(self, include=include, **kwargs)
 
-    def stage(self) -> None:
+    def stage(self, *args) -> None:
         """
         Identify a node instance that it is primed and ready to be migrated
         """
@@ -717,12 +715,29 @@ class Node(metaclass=NodeMeta):
         for arg, _ in self._annotations.items():
             if not arg.startswith("_") and arg != "uid":
                 val = getattr(self, arg, None)
-                if val is not None:
+                if val is not None and (not args or arg in args):
                     self.edges[arg] = val
         self._staged[self.uid] = self
 
+    def delete(self, node=None, pred: str = None) -> None:
+        if not pred:
+            pred = "*"
+        else:
+            pred = f"<{pred}>"
+
+        if not node:
+            node = "*"
+        else:
+            node = f"<{node.uid}>"
+
+        self._pending_delete.add(f"<{self.uid}> {pred} {node} .")
+
     def save(
-        self, client: PyDiggyClient = None, host: str = None, port: int = None
+        self,
+        client: PyDiggyClient = None,
+        host: str = None,
+        port: int = None,
+        commit: bool = True,
     ) -> None:
         # TODO:
         # - User self._annotations
@@ -742,6 +757,7 @@ class Node(metaclass=NodeMeta):
                 annotation = annotation.__args__[0]
 
             try:
+                # if annotation == str or pred == "_type":
                 if annotation == str:
                     obj = f'"{obj}"'
                 elif annotation == bool:
@@ -750,6 +766,10 @@ class Node(metaclass=NodeMeta):
                     obj = f'"{int(obj)}"^^<xs:int>'
                 elif annotation in (float,) or isinstance(obj, float):
                     obj = f'"{obj}"^^<xs:float>'
+                elif annotation in (geo,):
+                    if hasattr(obj, "__geojson__"):
+                        obj = obj.__geojson__()
+                    obj = f'"{obj}"^^<geo:geojson>'
                 elif Node._is_node_type(obj.__class__):
                     obj, passed = _parse_subject(obj.uid)
                     staged = Node._get_staged()
@@ -773,15 +793,21 @@ class Node(metaclass=NodeMeta):
             return obj
 
         setters = []
-        deleters = []
+        deleters = list(self._pending_delete)
 
-        saveable = (
+        saveable = [
             x for x in self._dirty if x != "computed" and x in annotations
-        )
+        ]
+
+        subject, passed = _parse_subject(self.uid)
+        if self._fresh:
+            line = f'{subject} <{self._type}> "true" .'
+            setters.append(line)
+            line = f'{subject} <_type> "{self._type}" .'
+            setters.append(line)
 
         for pred in saveable:
             obj = getattr(self, pred)
-            subject, passed = _parse_subject(self.uid)
             if not isinstance(obj, list):
                 obj = [obj]
 
@@ -811,7 +837,7 @@ class Node(metaclass=NodeMeta):
                     output = _make_obj(self, pred, output)
 
                     # Temporary measure until dgraph 1.1 with 1:1 uid
-                    if is_node_type:
+                    if is_node_type and commit and not self._fresh:
                         prop_type = annotations[pred]
                         is_list_type = (
                             True
@@ -835,15 +861,32 @@ class Node(metaclass=NodeMeta):
                         line = f"{subject} <{pred}> {output} ."
                     setters.append(line)
 
-        set_mutations = "\n".join(setters)
-        delete_mutations = "\n".join(deleters)
+        set_mutations = "\n\t".join(setters)
+        delete_mutations = "\n\t".join(deleters)
         transaction = client.txn()
+
+        print(
+            f"Ready for operation: {len(setters)} setters, {len(deleters)} deleters"
+        )
 
         try:
             if set_mutations or delete_mutations:
+                print("~ set_mutations")
+                print("\t" + (set_mutations if set_mutations else "NONE"))
+                print("~ delete_mutations")
+                print(
+                    "\t" + (delete_mutations if delete_mutations else "NONE")
+                )
                 o = transaction.mutate(
                     set_nquads=set_mutations, del_nquads=delete_mutations
                 )
-                transaction.commit()
+
+                if commit:
+                    transaction.commit()
+
+                    if hasattr(o, "uids"):
+                        if str(self.uid) in o.uids:
+                            self.uid = o.uids.get(self.uid)
         finally:
-            transaction.discard()
+            if commit:
+                transaction.discard()
