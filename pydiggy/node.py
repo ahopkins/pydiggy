@@ -657,6 +657,8 @@ class Node(metaclass=NodeMeta):
                         ]
                     else:
                         obj[key] = str(value)
+                elif isinstance(value, (dict,)):
+                    obj[key] = value
                 elif is_computed(value):
                     obj.update({key: value._asdict()})
                 elif is_facets(value):
