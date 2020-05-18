@@ -1,4 +1,4 @@
-**IMPORTANT NOTICE: I am still working on this project. Slowly, but I hope that it should be releasable by mid-2019.**
+**IMPORTANT NOTICE: WHile the concepts in here still work, with the release of dgraph 1.1 this project is being put aside. There are many changes that are needed to bring it up to date with (for example) enforced 1:1 or 1:many relationships. I am no longer using dgraph and therefore not currently supporting this package. I may come back to it in the future.**
 
 =======
 PyDiggy
